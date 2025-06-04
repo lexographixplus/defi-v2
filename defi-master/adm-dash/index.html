@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volunteer Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; /* Tailwind slate-100 */ }
+        .sidebar { background: linear-gradient(180deg, #4F46E5 0%, #3730a3 100%); color: white; }
+        .sidebar-item {
+            display: flex; align-items: center; width: 100%; text-align: left;
+            padding: 0.75rem 1rem; border-radius: 0.5rem;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+        .sidebar-item:hover, .sidebar-item.active-item {
+            background-color: rgba(255, 255, 255, 0.1); border-left-color: #a5b4fc; color: white;
+        }
+        .sidebar-item.active-item { background-color: rgba(255, 255, 255, 0.2); font-weight: 600; }
+        .submenu { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background-color: rgba(0,0,0,0.1); }
+        .submenu.open { max-height: 500px; }
+        .submenu .sidebar-item { padding-left: 2.5rem; border-left: none; border-top: 1px solid rgba(255,255,255,0.05); }
+        .submenu .sidebar-item:hover, .submenu .sidebar-item.active-item { background-color: rgba(255,255,255,0.15); }
+        
+        .modal { background-color: rgba(0,0,0,0.65); transition: opacity 0.3s ease-in-out; }
+        .modal-content {
+            background-color: white; border-radius: 0.75rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+            width: 100%; max-width: 90%; transform: scale(0.95); transition: transform 0.3s ease-in-out;
+            display: flex; flex-direction: column; max-height: 90vh; overflow: hidden;
+        }
+        @media (min-width: 768px) { .modal-content { max-width: 70%; } }
+        @media (min-width: 1024px) { .modal-content { max-width: 60%; } }
+        @media (min-width: 1280px) { .modal-content { max-width: 50%; } }
+        .modal-content.scale-100 { transform: scale(1); }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb; background-color: #f9fafb;
+            border-top-left-radius: 0.75rem; border-top-right-radius: 0.75rem;
+        }
+        .modal-header h3 { font-size: 1.25rem; font-weight: 600; color: #3730a3; }
+        .modal-header button { color: #6b7280; font-size: 1.75rem; line-height: 1; padding: 0.25rem; transition: color 0.2s ease; }
+        .modal-header button:hover { color: #1f2937; }
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex-grow: 1; background-color: #ffffff; }
+        .modal-body::-webkit-scrollbar { width: 8px; }
+        .modal-body::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .modal-body::-webkit-scrollbar-thumb { background: #4F46E5; border-radius: 10px; }
+        .modal-body::-webkit-scrollbar-thumb:hover { background: #3730a3; }
+        .modal-footer {
+            padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; background-color: #f9fafb;
+            border-bottom-left-radius: 0.75rem; border-bottom-right-radius: 0.75rem;
+            display: flex; justify-content: flex-end; gap: 0.75rem;
+        }
+
+        .btn { padding: 0.65rem 1.25rem; border-radius: 8px; font-weight: 500; transition: all 0.3s ease; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+        .btn-xs { padding: 0.35rem 0.75rem; font-size: 0.75rem; line-height: 1rem;}
+        .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; }
+        .btn-primary { background: linear-gradient(135deg, #4F46E5 0%, #8B5CF6 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3); }
+        .btn-secondary { background-color: #e0e7ff; color: #4F46E5; border: 1px solid #4F46E5; }
+        .btn-secondary:hover { background-color: #c7d2fe; }
+        .btn-success { background-color: #dcfce7; color: #16a34a; border: 1px solid #16a34a; }
+        .btn-success:hover { background-color: #bbf7d0; }
+        .btn-disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .unread-indicator {
+            position: absolute; top: -5px; right: -5px; width: 12px; height: 12px;
+            background-color: #ef4444; border-radius: 50%; border: 2px solid white;
+            display: none; z-index: 10;
+        }
+        .has-unread .unread-indicator { display: block; }
+        .has-unread .fa-eye { color: #ef4444; }
+
+
+        input[type="text"], input[type="search"], select, textarea {
+            border: 1px solid #d1d5db; border-radius: 6px; padding: 0.5rem 0.75rem;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            background-color: white; width: 100%;
+        }
+        input[type="text"]:focus, input[type="search"]:focus, select:focus, textarea:focus {
+            border-color: #4F46E5; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.25); outline: none;
+        }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+
+
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #4F46E5; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 2rem auto; }
+        .auth-loader {
+            border: 5px solid #e0e7ff; border-top: 5px solid #3730a3; border-radius: 50%; width: 50px; height: 50px;
+            animation: spin 1.2s linear infinite; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); z-index: 2000;
+        }
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff;
+            width: 20px; height: 20px; animation: spin 1s ease-in-out infinite;
+        }
+        .btn-secondary .spinner, .btn-success .spinner { border-top-color: #4F46E5; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .section-title {
+            font-size: 1.5rem; font-weight: 700; color: #3730a3;
+            margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e0e7ff;
+        }
+        .analytics-section, .dashboard-section-content, .category-section-content {
+            background-color: white; padding: 1.5rem; border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.07), 0 4px 6px -2px rgba(0,0,0,0.05);
+            margin-bottom: 1.5rem;
+        }
+        
+        .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+        .analytics-card { 
+            background-color: #ffffff; padding: 1.5rem; border-radius: 0.75rem;
+            border: 1px solid #e5e7eb; 
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.05);
+        }
+        .card-title { 
+            font-size: 0.875rem; font-weight: 500; color: #6b7280;
+            margin-bottom: 0.5rem; display: flex; align-items: center;
+        }
+        .card-title i { margin-right: 0.5rem; color: #8b5cf6; }
+
+        .analytics-metric-value { 
+            font-weight: 700; color: #3730a3; font-size: 2.25rem; line-height: 1.1;
+        }
+        .chart-container { position: relative; height: 320px; width: 100%; margin-top: 1rem; }
+        
+        .keyword-tags-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+        .keyword-tag {
+            background-color: #e0e7ff; color: #4338ca; padding: 0.375rem 0.875rem;
+            border-radius: 9999px; font-size: 0.8rem; font-weight: 500;
+            display: inline-flex; align-items: center; line-height: 1.2;
+        }
+        .keyword-tag .count {
+            margin-left: 0.375rem; font-size: 0.7rem; background-color: #c7d2fe;
+            color: #3730a3; padding: 0.125rem 0.375rem; border-radius: 9999px;
+        }
+
+        .latest-submission-item { font-size: 0.875rem; padding: 0.5rem 0; border-bottom: 1px solid #eef2ff; }
+        .latest-submission-item:last-child { border-bottom: none; }
+        .latest-submission-item strong { color: #3730a3; }
+
+        .sub-nav-container { margin-bottom: 1.5rem; border-bottom: 2px solid #e0e7ff; }
+        .sub-nav-button {
+            padding: 0.75rem 1.25rem; margin-right: 0.5rem; margin-bottom: -2px;
+            border: none; border-bottom: 3px solid transparent; background-color: transparent;
+            color: #4b5563; font-size: 0.9rem; font-weight: 500; cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+        }
+        .sub-nav-button:hover { color: #4F46E5; background-color: #f3f4f6; }
+        .sub-nav-button.active-sub-tab {
+            color: #4F46E5; border-bottom-color: #4F46E5; font-weight: 600;
+        }
+        
+        .competency-group-tabs-container {
+            display: flex; flex-wrap: wrap; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.5rem;
+        }
+        .competency-group-tab-button {
+            padding: 0.75rem 1.25rem; margin-right: 0.5rem; margin-bottom: -2px;
+            border: none; border-bottom: 3px solid transparent; background-color: transparent;
+            color: #4b5563; font-size: 0.9rem; font-weight: 500; cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+        }
+        .competency-group-tab-button:hover { color: #4F46E5; background-color: #f3f4f6; }
+        .competency-group-tab-button.active-chart-tab {
+            color: #4F46E5; border-bottom-color: #4F46E5; font-weight: 600;
+        }
+        .competency-group-chart-content { display: none; }
+        .competency-group-chart-content.active-chart-content { display: block; padding-top: 1rem; }
+
+        .submission-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
+        .submission-card {
+            background-color: #ffffff; border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .submission-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.1); }
+        .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb; background-color: #f9fafb; }
+        .card-content { padding: 1.25rem; flex-grow: 1; }
+        .card-footer { padding: 1rem 1.25rem; border-top: 1px solid #e5e7eb; background-color: #f9fafb; display: flex; justify-content: space-between; align-items: center; }
+
+        .discussion-thread-section { margin-top: 1.5rem; padding: 1rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.5rem; }
+        .discussion-thread-section h4 { font-size: 1.125rem; font-weight: 600; color: #3730a3; margin-bottom: 0.75rem; }
+        .discussion-item { padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 0.75rem; }
+        .discussion-item p { white-space: pre-wrap; margin-bottom: 0.25rem; }
+        .discussion-item .author-info { font-size: 0.75rem; color: #6b7280; }
+        .discussion-item.admin-comment { background-color: #fffbeb; border: 1px solid #fef3c7; }
+        .discussion-item.admin-comment .author-info strong { color: #b45309; }
+        .discussion-item.volunteer-reply { background-color: #eff6ff; border: 1px solid #dbeafe; }
+        .discussion-item.volunteer-reply .author-info strong { color: #1d4ed8; }
+        /* Style for "my" admin comments */
+        .discussion-item.my-admin-comment {
+            background-color: #fffde7; /* Lighter yellow, or your preferred highlight */
+            border: 1px solid #fef9c3; 
+        }
+        .discussion-item.my-admin-comment .author-info strong {
+            color: #a16207; /* Darker yellow/brown */
+        }
+    </style>
+</head>
+<body>
+    <div id="authLoader" class="auth-loader"></div>
+    <div id="adminDashboardContent" class="hidden">
+        <div class="flex h-screen">
+            <aside class="sidebar w-64 min-h-screen p-6 space-y-2 hidden md:flex flex-col" aria-label="Admin Sidebar">
+                <div class="text-2xl font-bold mb-6 flex items-center"><i class="fas fa-shield-alt mr-3"></i> Admin Panel</div>
+                <nav class="flex-grow" aria-label="Admin Navigation">
+                    <button type="button" data-view="dashboard" class="sidebar-item w-full text-left px-4 py-3 rounded-lg flex items-center active-item">
+                        <i class="fas fa-tachometer-alt mr-3 w-5"></i> Dashboard
+                    </button>
+                    <div>
+                        <button type="button" id="categoriesMenuToggle" class="sidebar-item w-full text-left px-4 py-3 rounded-lg flex items-center justify-between">
+                            <span><i class="fas fa-list-ul mr-3 w-5"></i> Categories</span>
+                            <i class="fas fa-chevron-down transition-transform duration-200" id="categoriesChevron"></i>
+                        </button>
+                        <div id="categoriesSubmenu" class="submenu">
+                            <button type="button" data-view="category" data-category="PST" class="sidebar-item tab-button w-full text-left px-4 py-3 rounded-lg flex items-center"><i class="fas fa-chalkboard-teacher mr-3 w-5"></i> PST</button>
+                            <button type="button" data-view="category" data-category="IST-1" class="sidebar-item tab-button w-full text-left px-4 py-3 rounded-lg flex items-center"><i class="fas fa-book-reader mr-3 w-5"></i> IST-1</button>
+                            <button type="button" data-view="category" data-category="IST-2" class="sidebar-item tab-button w-full text-left px-4 py-3 rounded-lg flex items-center"><i class="fas fa-graduation-cap mr-3 w-5"></i> IST-2</button>
+                            <button type="button" data-view="category" data-category="COS" class="sidebar-item tab-button w-full text-left px-4 py-3 rounded-lg flex items-center"><i class="fas fa-flag-checkered mr-3 w-5"></i> COS</button>
+                        </div>
+                    </div>
+                </nav>
+                <div class="mt-auto">
+                     <button type="button" id="logoutButton" class="sidebar-item w-full text-left px-4 py-3 rounded-lg flex items-center hover:bg-red-500 hover:bg-opacity-20 text-indigo-200 hover:text-white !border-transparent">
+                        <i class="fas fa-sign-out-alt mr-3 w-5"></i> Logout
+                    </button>
+                    <div class="text-xs text-indigo-300 mt-2 text-center">© <span id="currentYear"></span> Created by Essa Janko</div>
+                </div>
+            </aside>
+
+            <main class="flex-1 p-4 md:p-8 overflow-y-auto">
+                <header class="mb-8">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 id="mainViewTitle" class="text-3xl font-bold text-gray-800">Dashboard</h1>
+                            <p class="text-sm text-gray-500">Logged in as: <span id="loggedInUserEmail" class="font-medium"></span> (<span id="loggedInUserUID" class="text-xs"></span>)</p>
+                        </div>
+                        <button id="mobileMenuButton" class="md:hidden p-2 rounded-md text-gray-600 hover:bg-gray-200 focus:outline-none"><i class="fas fa-bars text-xl"></i></button>
+                    </div>
+                     <aside id="mobileSidebar" class="sidebar fixed inset-0 z-40 w-64 min-h-screen p-6 space-y-2 flex-col transform -translate-x-full transition-transform duration-300 ease-in-out md:hidden" aria-label="Mobile Admin Sidebar">
+                        <div class="flex justify-between items-center mb-6">
+                            <div class="text-2xl font-bold flex items-center"><i class="fas fa-shield-alt mr-3"></i> Admin</div>
+                            <button type="button" id="closeMobileMenuButton" class="p-2 rounded-md text-white hover:bg-white hover:text-indigo-600 focus:outline-none"><i class="fas fa-times text-xl"></i></button>
+                        </div>
+                        <nav class="flex-grow" aria-label="Mobile Admin Navigation">
+                             <button type="button" data-view="dashboard" class="sidebar-item w-full text-left px-4 py-3 rounded-lg flex items-center active-item"><i class="fas fa-tachometer-alt mr-3 w-5"></i> Dashboard</button>
+                            <div>
+                                <button type="button" id="mobileCategoriesMenuToggle" class="sidebar-item w-full text-left px-4 py-3 rounded-lg flex items-center justify-between">
+                                    <span><i class="fas fa-list-ul mr-3 w-5"></i> Categories</span>
+                                    <i class="fas fa-chevron-down transition-transform duration-200" id="mobileCategoriesChevron"></i>
+                                </button>
+                                <div id="mobileCategoriesSubmenu" class="submenu">
+                                    <button type="button" data-view="category" data-category="PST" class="sidebar-item tab-button w-full text-left px-4 py-3 rounded-lg flex items-center"><i class="fas fa-chalkboard-teacher mr-3 w-5"></i> PST</button>
+                                    <button type="button" data-view="category" data-category="IST-1" class="sidebar-item tab-button w-full text-left px-4 py-3 rounded-lg flex items-center"><i class="fas fa-book-reader mr-3 w-5"></i> IST-1</button>
+                                    <button type="button" data-view="category" data-category="IST-2" class="sidebar-item tab-button w-full text-left px-4 py-3 rounded-lg flex items-center"><i class="fas fa-graduation-cap mr-3 w-5"></i> IST-2</button>
+                                    <button type="button" data-view="category" data-category="COS" class="sidebar-item tab-button w-full text-left px-4 py-3 rounded-lg flex items-center"><i class="fas fa-flag-checkered mr-3 w-5"></i> COS</button>
+                                </div>
+                            </div>
+                        </nav>
+                        <div class="mt-auto">
+                            <button type="button" id="mobileLogoutButton" class="sidebar-item w-full text-left px-4 py-3 rounded-lg flex items-center hover:bg-red-500 hover:bg-opacity-20 text-indigo-200 hover:text-white !border-transparent">
+                                <i class="fas fa-sign-out-alt mr-3 w-5"></i> Logout
+                            </button>
+                            <div class="text-xs text-indigo-300 mt-2 text-center">© <span id="mobileCurrentYear"></span> Created by Essa Janko</div>
+                        </div>
+                    </aside>
+                </header>
+
+                <div id="dashboardView" class="dashboard-section-content">
+                    <h2 class="section-title">Global Overview</h2>
+                    <div id="dashboardAnalyticsSection" class="analytics-section !shadow-none !p-0 !mb-0">
+                         <div class="analytics-grid">
+                            <div class="analytics-card">
+                                <h3 class="card-title"><i class="fas fa-file-alt"></i>Total Submissions (All Categories)</h3>
+                                <p id="globalTotalSubmissionsValue" class="analytics-metric-value">Loading...</p>
+                            </div>
+                            <div class="analytics-card">
+                                 <h3 class="card-title"><i class="fas fa-tags"></i>Common Evidence Keywords (Top 10)</h3>
+                                 <div id="globalCommonKeywordsContainer" class="keyword-tags-container">
+                                    <p class="text-sm text-gray-500">Loading keywords...</p>
+                                 </div>
+                            </div>
+                        </div>
+                        <div class="analytics-card mt-6">
+                            <h3 class="card-title"><i class="fas fa-chart-bar"></i>Average Competency Ratings (All Categories)</h3>
+                            <div class="chart-container">
+                                <canvas id="globalCompetencyRatingsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <h2 class="section-title mt-8">Latest Submissions</h2>
+                    <div id="latestSubmissionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <p class="text-gray-500">Loading latest submissions...</p>
+                    </div>
+                </div>
+
+                <div id="categoryView" class="hidden category-section-content">
+                    <div class="sub-nav-container flex items-center">
+                        <button type="button" id="categoryEntriesTabButton" data-subview="entries" class="sub-nav-button active-sub-tab">
+                            <i class="fas fa-list-alt mr-2"></i>Entries
+                        </button>
+                        <button type="button" id="categoryAnalyticsTabButton" data-subview="analytics" class="sub-nav-button">
+                            <i class="fas fa-chart-bar mr-2"></i>Analytics
+                        </button>
+                    </div>
+
+                    <div id="categoryEntriesView">
+                        <div class="bg-white p-4 sm:p-6 rounded-xl shadow-inner mb-6">
+                            <div class="flex flex-col sm:flex-row gap-4 items-center">
+                                <div class="flex-grow w-full sm:w-auto">
+                                    <label for="globalSearchTerm" class="sr-only">Search Term</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-search text-gray-400"></i>
+                                        </div>
+                                        <input type="search" id="globalSearchTerm" class="w-full pl-10" placeholder="Search entries...">
+                                    </div>
+                                </div>
+                                <div class="w-full sm:w-auto sm:min-w-[200px]"> <label for="globalSearchField" class="sr-only">Search By</label>
+                                    <select id="globalSearchField" class="w-full">
+                                        <option value="all">All Fields</option>
+                                        <option value="name">Name</option>
+                                        <option value="email">Email</option>
+                                        <option value="community">Community</option>
+                                        <option value="cohort">Cohort</option>
+                                        <option value="country">Country</option> <option value="year">Year</option>
+                                    </select>
+                                </div>
+                                <button id="exportCsvBtn" class="btn btn-success btn-sm w-full sm:w-auto whitespace-nowrap ml-auto">
+                                    <i class="fas fa-file-csv mr-2"></i>Export Filtered
+                                </button>
+                            </div>
+                        </div>
+                        <div id="loader" class="loader hidden"></div>
+                        <div id="submissionCardGridContainer" class="submission-card-grid">
+                            </div>
+                        <div id="noDataMessage" class="text-center py-10 text-gray-500 hidden">
+                            <i class="fas fa-folder-open fa-3x mb-3 text-gray-400"></i>
+                            <p>No submissions found for this category or filters.</p>
+                        </div>
+                        <div id="paginationControls" class="mt-8 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                        </div>
+                    </div>
+
+                    <div id="categoryAnalyticsView" class="analytics-section hidden">
+                        <h2 class="section-title">Analytics for <span id="categoryAnalyticsTitle">Category</span></h2>
+                         <div class="analytics-grid">
+                            <div class="analytics-card">
+                                <h3 class="card-title"><i class="fas fa-file-alt"></i>Total Submissions</h3>
+                                <p id="categoryTotalSubmissionsValue" class="analytics-metric-value">0</p>
+                            </div>
+                            <div class="analytics-card">
+                                 <h3 class="card-title"><i class="fas fa-tags"></i>Common Evidence Keywords (Top 10)</h3>
+                                 <div id="categoryCommonKeywordsContainer" class="keyword-tags-container">
+                                    <p class="text-sm text-gray-500">No evidence to analyze.</p>
+                                 </div>
+                            </div>
+                        </div>
+                        <div class="analytics-card mt-6">
+                            <h3 class="card-title"><i class="fas fa-tasks"></i>Average Competency Ratings by Group</h3>
+                            <div id="competencyGroupTabsContainer" class="competency-group-tabs-container">
+                            </div>
+                            <div id="competencyGroupChartsArea">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <div id="entryModal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden opacity-0">
+             <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalEntryTitle" class="text-xl font-semibold">Volunteer Submission Details</h3>
+                    <button id="closeModalBtn" class="text-2xl leading-none p-1">&times;</button>
+                </div>
+                <div id="modalBodyContent" class="modal-body">
+                </div>
+                <div class="modal-footer justify-between">
+                    <div>
+                        <button id="openAdminCommentModalBtn" class="btn btn-secondary">
+                            <i class="fas fa-plus-circle mr-2"></i> Comment
+                        </button>
+                    </div>
+                    <div>
+                        <button id="downloadModalPdfBtn" class="btn btn-secondary">
+                            <span id="pdfBtnText"><i class="fas fa-file-pdf mr-2"></i>Download</span>
+                            <div id="pdfSpinner" class="spinner hidden"></div>
+                        </button>
+                        <button id="cancelModalBtn" class="btn btn-primary">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="adminCommentModal" class="modal fixed inset-0 z-[60] flex items-center justify-center p-4 hidden opacity-0">
+            <div class="modal-content max-w-lg">
+                <div class="modal-header">
+                    <h3 id="commentModalTitle" class="text-xl font-semibold">Comment</h3>
+                    <button id="closeCommentModalBtn" class="text-2xl leading-none p-1">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="commentEntryId">
+                    <input type="hidden" id="commentEntryCategory">
+                    <div>
+                        <label for="adminDiscussionText" class="block text-sm font-medium text-gray-700 mb-1">New Comment/Note:</label>
+                        <textarea id="adminDiscussionText" name="adminDiscussionText" rows="5" class="shadow-sm mt-1 block w-full sm:text-sm border border-gray-300 rounded-md p-2" placeholder="Enter your comment for the discussion thread..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancelCommentModalBtn" class="btn btn-secondary">Cancel</button>
+                    <button id="saveCommentBtn" class="btn btn-primary">
+                        <span id="saveCommentBtnText">Add Comment</span>
+                        <div id="saveCommentSpinner" class="spinner hidden"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="messageModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden opacity-0 bg-black bg-opacity-50">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center transform scale-95 transition-transform duration-300">
+                <h3 id="messageModalTitleEl" class="text-lg font-semibold mb-2 text-indigo-700">Notification</h3>
+                <p id="messageModalTextEl" class="text-sm text-gray-600 mb-4">Message here.</p>
+                <button id="messageModalCloseBtn" class="btn btn-primary px-4 py-2 rounded-md text-sm">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import {
+            getFirestore, collection, getDocs, query, orderBy, Timestamp, limit, doc, getDoc,
+            updateDoc, arrayUnion, serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signOut as firebaseSignOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_lcgd9BO8udBIKgvqLfbpWwBQx4gKIqk", 
+            authDomain: "volunteer-competencies.firebaseapp.com",
+            projectId: "volunteer-competencies",
+            storageBucket: "volunteer-competencies.appspot.com",
+            messagingSenderId: "834830665261",
+            appId: "1:834830665261:web:3ef0bfd09600d8ba8a5aa4"
+        };
+
+        const fbApp = initializeApp(firebaseConfig);
+        const db = getFirestore(fbApp);
+        const auth = getAuth(fbApp);
+
+        console.log("Firebase Admin Panel Initialized (v10.12.2).");
+
+        const adminDashboardContent = document.getElementById('adminDashboardContent');
+        const authLoaderDiv = document.getElementById('authLoader');
+        const loggedInUserEmailSpan = document.getElementById('loggedInUserEmail');
+        const loggedInUserUIDSpan = document.getElementById('loggedInUserUID'); // For debugging admin status
+        const mainViewTitle = document.getElementById('mainViewTitle');
+
+        const categoriesMenuToggle = document.getElementById('categoriesMenuToggle');
+        const categoriesSubmenu = document.getElementById('categoriesSubmenu');
+        const categoriesChevron = document.getElementById('categoriesChevron');
+        const mobileCategoriesMenuToggle = document.getElementById('mobileCategoriesMenuToggle');
+        const mobileCategoriesSubmenu = document.getElementById('mobileCategoriesSubmenu');
+        const mobileCategoriesChevron = document.getElementById('mobileCategoriesChevron');
+
+        const dashboardView = document.getElementById('dashboardView');
+        const categoryView = document.getElementById('categoryView');
+
+        const latestSubmissionsGrid = document.getElementById('latestSubmissionsGrid');
+        const globalTotalSubmissionsValue = document.getElementById('globalTotalSubmissionsValue');
+        const globalCommonKeywordsContainer = document.getElementById('globalCommonKeywordsContainer');
+        const globalCompetencyRatingsChartCanvas = document.getElementById('globalCompetencyRatingsChart');
+
+        const categoryEntriesTabButton = document.getElementById('categoryEntriesTabButton');
+        const categoryAnalyticsTabButton = document.getElementById('categoryAnalyticsTabButton');
+        const categoryEntriesView = document.getElementById('categoryEntriesView');
+        const categoryAnalyticsView = document.getElementById('categoryAnalyticsView');
+        const categoryAnalyticsTitle = document.getElementById('categoryAnalyticsTitle');
+        const categoryTotalSubmissionsValue = document.getElementById('categoryTotalSubmissionsValue');
+        const categoryCommonKeywordsContainer = document.getElementById('categoryCommonKeywordsContainer');
+        const competencyGroupTabsContainer = document.getElementById('competencyGroupTabsContainer');
+        const competencyGroupChartsArea = document.getElementById('competencyGroupChartsArea');
+
+        const submissionCardGridContainer = document.getElementById('submissionCardGridContainer');
+        const loader = document.getElementById('loader');
+        const noDataMessage = document.getElementById('noDataMessage');
+        
+        const globalSearchTermInput = document.getElementById('globalSearchTerm');
+        const globalSearchFieldSelect = document.getElementById('globalSearchField');
+        const exportCsvBtn = document.getElementById('exportCsvBtn');
+
+        const entryModal = document.getElementById('entryModal');
+        const modalEntryTitle = document.getElementById('modalEntryTitle');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const cancelModalBtn = document.getElementById('cancelModalBtn');
+        const modalBodyContent = document.getElementById('modalBodyContent');
+        const downloadModalPdfBtn = document.getElementById('downloadModalPdfBtn');
+        const pdfBtnText = document.getElementById('pdfBtnText');
+        const pdfSpinner = document.getElementById('pdfSpinner');
+        const openAdminCommentModalBtn = document.getElementById('openAdminCommentModalBtn');
+
+        const adminCommentModal = document.getElementById('adminCommentModal');
+        const commentModalTitle = document.getElementById('commentModalTitle');
+        const closeCommentModalBtn = document.getElementById('closeCommentModalBtn');
+        const cancelCommentModalBtn = document.getElementById('cancelCommentModalBtn');
+        const saveCommentBtn = document.getElementById('saveCommentBtn');
+        const saveCommentBtnText = document.getElementById('saveCommentBtnText');
+        const saveCommentSpinner = document.getElementById('saveCommentSpinner');
+        const adminDiscussionText = document.getElementById('adminDiscussionText');
+        const commentEntryIdInput = document.getElementById('commentEntryId');
+        const commentEntryCategoryInput = document.getElementById('commentEntryCategory');
+
+        const messageModal = document.getElementById('messageModal');
+        const messageModalTitleEl = document.getElementById('messageModalTitleEl');
+        const messageModalTextEl = document.getElementById('messageModalTextEl');
+        const messageModalCloseBtn = document.getElementById('messageModalCloseBtn');
+
+        const CATEGORIES = ["PST", "IST-1", "IST-2", "COS"];
+        let currentView = "dashboard";
+        let currentCategory = null;
+        let currentCategorySubView = "entries";
+        let currentCompetencyGroupChartTab = 0;
+        let allSubmissionsData = []; // Used for global dashboard metrics
+        let categoryDataCache = {}; // Cache for individual category data
+        let filterTimeout;
+        let globalChartInstance = null;
+        let categoryGroupChartInstances = []; // Array to hold chart instances for category analytics
+        let currentOpenEntryForModal = null;
+        let currentFilteredDataForCsv = [];
+
+
+        const competencyGroups = [
+            { groupName: "Exemplify", groupId: "leadership", competencies: [{ id: "Initiative", name: "Initiative" }, { id: "Adaptability", name: "Adaptability" }, { id: "ServiceOrientation", name: "Service Orientation" }] },
+            { groupName: "Demonstrate Persoanal Responsibility", groupId: "responsibility", competencies: [{ id: "PersonalConduct", name: "Personal Conduct" }, { id: "HealthSafetyWellBeing", name: "Health, Safety, & Well-Being" }, { id: "Communication", name: "Communication" }] },
+            { groupName: "Integrate into Community", groupId: "integration", competencies: [{ id: "Empathy", name: "Empathy" }, { id: "HumilityTeamwork", name: "Humility & Teamwork" }, { id: "LanguageInterculturalProficiency", name: "Language & Intercultural Proficiency" }] },
+            { groupName: "Facilitate CLD", groupId: "development", competencies: [{ id: "HCD_ABCD", name: "HCD/ABCD" }, { id: "ProjectDesignManagement", name: "Project Design & Management" }, { id: "CapacityBuilding", name: "Capacity Building" }] }
+        ];
+        const allCompetenciesForAnalytics = competencyGroups.flatMap(group => group.competencies);
+        const stopWords = new Set(["a","an","and","are","as","at","be","but","by","for","if","in","into","is","it","no","not","of","on","or","such","that","the","their","then","there","these","they","this","to","was","will","with","i","me","my","myself","we","our","ours","ourselves","you","your","yours","yourself","yourselves","he","him","his","himself","she","her","hers","herself","it","its","itself","they","them","their","theirs","themselves","what","which","who","whom","this","that","these","those","am","is","are","was","were","be","been","being","have","has","had","having","do","does","did","doing","a","an","the","and","but","if","or","because","as","until","while","of","at","by","for","with","about","against","between","into","through","during","before","after","above","below","to","from","up","down","in","out","on","off","over","under","again","further","then","once","here","there","when","where","why","how","all","any","both","each","few","more","most","other","some","such","no","nor","not","only","own","same","so","than","too","very","s","t","can","will","just","don","should","now","also","etc","e.g."]);
+
+        function sanitizeHTML(str) {
+            if (str === null || typeof str === 'undefined') return '';
+            const temp = document.createElement('div');
+            temp.textContent = String(str);
+            return temp.innerHTML;
+        }
+
+        function formatDate(dateInput, includeTime = false) {
+            if (!dateInput) return 'N/A';
+            try {
+                let date;
+                if (dateInput instanceof Timestamp) { date = dateInput.toDate(); }
+                else if (dateInput instanceof Date) { date = dateInput; }
+                else if (typeof dateInput === 'string' || typeof dateInput === 'number') { date = new Date(dateInput); }
+                else { return String(dateInput); }
+
+                if (isNaN(date.getTime())) return String(dateInput);
+
+                const options = { year: 'numeric', month: 'short', day: 'numeric' };
+                if (includeTime) {
+                    options.hour = '2-digit'; options.minute = '2-digit'; options.hour12 = true;
+                }
+                return date.toLocaleDateString(undefined, options);
+            } catch (e) { console.warn("Could not format date:", dateInput, e); return String(dateInput); }
+        }
+
+        function showGenericMessage(title, text, isError = false) {
+            if(messageModalTitleEl) messageModalTitleEl.textContent = title;
+            if(messageModalTextEl) messageModalTextEl.textContent = text;
+            if(messageModalTitleEl) messageModalTitleEl.className = `text-lg font-semibold mb-2 ${isError ? 'text-red-600' : 'text-indigo-700'}`;
+            if(messageModal) {
+                messageModal.classList.remove('hidden', 'opacity-0');
+                const modalDialog = messageModal.querySelector('div');
+                if (modalDialog) { 
+                    requestAnimationFrame(() => {
+                        modalDialog.classList.remove('scale-95');
+                        modalDialog.classList.add('scale-100');
+                    });
+                }
+            }
+        }
+        function closeGenericMessage() {
+            if(messageModal) {
+                const modalDialog = messageModal.querySelector('div');
+                 if (modalDialog) { 
+                    modalDialog.classList.remove('scale-100');
+                    modalDialog.classList.add('scale-95');
+                }
+                messageModal.classList.add('opacity-0');
+                setTimeout(() => messageModal.classList.add('hidden'), 300);
+            }
+        }
+        if(messageModalCloseBtn) messageModalCloseBtn.addEventListener('click', closeGenericMessage);
+
+
+        async function handleLogout() {
+            try {
+                await firebaseSignOut(auth);
+                // onAuthStateChanged will redirect to login
+            } catch (error) {
+                showGenericMessage('Logout Error', `Failed to logout. ${error.message}`, true);
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("Admin Panel - User Authenticated. UID:", user.uid, "Email:", user.email); // For debugging
+                if(authLoaderDiv) authLoaderDiv.style.display = 'none';
+                if(adminDashboardContent) adminDashboardContent.classList.remove('hidden');
+                if(loggedInUserEmailSpan) loggedInUserEmailSpan.textContent = user.email;
+                if(loggedInUserUIDSpan) loggedInUserUIDSpan.textContent = `UID: ${user.uid}`; // Display UID
+                initializeAdminPanel();
+            } else {
+                console.log("No admin user authenticated. Redirecting to login.");
+                window.location.href = '../admin-login.html';
+            }
+        });
+
+        function initializeAdminPanel() {
+            console.log("Initializing Admin Panel...");
+            const currentYearSpan = document.getElementById('currentYear');
+            const mobileCurrentYearSpan = document.getElementById('mobileCurrentYear');
+            if(currentYearSpan) currentYearSpan.textContent = new Date().getFullYear();
+            if(mobileCurrentYearSpan) mobileCurrentYearSpan.textContent = new Date().getFullYear();
+
+            document.querySelectorAll('.sidebar-item[data-view]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const view = button.dataset.view;
+                    const category = button.dataset.category || null;
+                    switchView(view, category);
+                });
+            });
+
+            const toggleSubmenu = (submenuEl, chevronEl) => {
+                 if(submenuEl && chevronEl){
+                    submenuEl.classList.toggle('open');
+                    chevronEl.classList.toggle('fa-chevron-down');
+                    chevronEl.classList.toggle('fa-chevron-up');
+                }
+            };
+            if(categoriesMenuToggle && categoriesSubmenu && categoriesChevron) categoriesMenuToggle.addEventListener('click', () => toggleSubmenu(categoriesSubmenu, categoriesChevron));
+            if(mobileCategoriesMenuToggle && mobileCategoriesSubmenu && mobileCategoriesChevron) mobileCategoriesMenuToggle.addEventListener('click', () => toggleSubmenu(mobileCategoriesSubmenu, mobileCategoriesChevron));
+
+            if(globalSearchTermInput) globalSearchTermInput.addEventListener('input', handleSearchInput);
+            if(globalSearchFieldSelect) globalSearchFieldSelect.addEventListener('change', handleSearchInput);
+            if(exportCsvBtn) exportCsvBtn.addEventListener('click', handleExportCsv);
+
+
+            if(categoryEntriesTabButton) categoryEntriesTabButton.addEventListener('click', () => switchCategorySubView('entries'));
+            if(categoryAnalyticsTabButton) categoryAnalyticsTabButton.addEventListener('click', () => switchCategorySubView('analytics'));
+
+            initializeCompetencyGroupChartTabs();
+
+            const logoutButton = document.getElementById('logoutButton');
+            const mobileLogoutButton = document.getElementById('mobileLogoutButton');
+            if(logoutButton) logoutButton.addEventListener('click', handleLogout);
+            if(mobileLogoutButton) mobileLogoutButton.addEventListener('click', handleLogout);
+
+            if(closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+            if(cancelModalBtn) cancelModalBtn.addEventListener('click', closeModal);
+            if(entryModal) entryModal.addEventListener('click', (event) => { if (event.target === entryModal) closeModal(); });
+            if(downloadModalPdfBtn) downloadModalPdfBtn.addEventListener('click', handleModalPdfDownload);
+
+            if(openAdminCommentModalBtn) openAdminCommentModalBtn.addEventListener('click', () => {
+                if (currentOpenEntryForModal) {
+                     openAdminCommentModal(currentOpenEntryForModal);
+                } else {
+                    showGenericMessage("Error", "No submission selected to add to discussion.", true);
+                }
+            });
+            if(closeCommentModalBtn) closeCommentModalBtn.addEventListener('click', closeAdminCommentModal);
+            if(cancelCommentModalBtn) cancelCommentModalBtn.addEventListener('click', closeAdminCommentModal);
+            if(saveCommentBtn) saveCommentBtn.addEventListener('click', handleSaveComment);
+            if(adminCommentModal) adminCommentModal.addEventListener('click', (event) => {
+                if (event.target === adminCommentModal) closeAdminCommentModal();
+            });
+
+            const mobileMenuButton = document.getElementById('mobileMenuButton');
+            const closeMobileMenuButton = document.getElementById('closeMobileMenuButton');
+            const mobileSidebar = document.getElementById('mobileSidebar');
+            if(mobileMenuButton && mobileSidebar) mobileMenuButton.addEventListener('click', () => mobileSidebar.classList.replace('-translate-x-full', 'translate-x-0'));
+            if(closeMobileMenuButton && mobileSidebar) closeMobileMenuButton.addEventListener('click', () => mobileSidebar.classList.replace('translate-x-0', '-translate-x-full'));
+
+            switchView('dashboard'); // Load dashboard by default
+            console.log("Admin Panel Initialized.");
+        }
+
+        async function switchView(view, category = null) {
+            console.log(`Switching view to: ${view}, Category: ${category}`);
+            currentView = view;
+            currentCategory = category;
+            currentCategorySubView = 'entries'; // Default to entries when switching main category view
+
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active-item'));
+            const activeBtnQuery = category ? `.sidebar-item[data-view="category"][data-category="${category}"]` : `.sidebar-item[data-view="dashboard"]`;
+            document.querySelectorAll(activeBtnQuery).forEach(btn => btn.classList.add('active-item'));
+
+            if(dashboardView) dashboardView.classList.add('hidden');
+            if(categoryView) categoryView.classList.add('hidden');
+
+            if (view === 'dashboard') {
+                if(mainViewTitle) mainViewTitle.textContent = 'Dashboard';
+                if(dashboardView) dashboardView.classList.remove('hidden');
+                await fetchAndRenderDashboardData();
+            } else if (view === 'category' && category) {
+                if(mainViewTitle) mainViewTitle.textContent = `${category} Submissions`;
+                if(categoryView) categoryView.classList.remove('hidden');
+                if(categoryAnalyticsTitle) categoryAnalyticsTitle.textContent = category;
+                await fetchAndRenderCategoryData(category); // This will fetch data if not cached
+                switchCategorySubView('entries'); // Ensure entries view is shown first
+            }
+
+            const mobileSidebarEl = document.getElementById('mobileSidebar');
+            if (mobileSidebarEl && mobileSidebarEl.classList.contains('translate-x-0')) {
+                mobileSidebarEl.classList.replace('translate-x-0', '-translate-x-full');
+            }
+        }
+
+        function switchCategorySubView(subView) {
+            currentCategorySubView = subView;
+            if (subView === 'entries') {
+                if(categoryEntriesView) categoryEntriesView.classList.remove('hidden');
+                if(categoryAnalyticsView) categoryAnalyticsView.classList.add('hidden');
+                if(categoryEntriesTabButton) categoryEntriesTabButton.classList.add('active-sub-tab');
+                if(categoryAnalyticsTabButton) categoryAnalyticsTabButton.classList.remove('active-sub-tab');
+                // Re-render or ensure data is displayed if already fetched for the current category
+                if(currentCategory && categoryDataCache[currentCategory]) {
+                    filterAndRenderCategoryTable(currentCategory);
+                }
+            } else if (subView === 'analytics') {
+                if(categoryEntriesView) categoryEntriesView.classList.add('hidden');
+                if(categoryAnalyticsView) categoryAnalyticsView.classList.remove('hidden');
+                if(categoryEntriesTabButton) categoryEntriesTabButton.classList.remove('active-sub-tab');
+                if(categoryAnalyticsTabButton) categoryAnalyticsTabButton.classList.add('active-sub-tab');
+
+                if (currentCategory && categoryDataCache[currentCategory] && categoryDataCache[currentCategory].data) {
+                    calculateAndDisplayCategoryMetrics(categoryDataCache[currentCategory].data, currentCategory);
+                } else if (currentCategory) {
+                    // If analytics tab is clicked and data isn't there, fetch it then show analytics
+                    fetchAndRenderCategoryData(currentCategory).then(() => {
+                        if(categoryDataCache[currentCategory] && categoryDataCache[currentCategory].data) {
+                             calculateAndDisplayCategoryMetrics(categoryDataCache[currentCategory].data, currentCategory);
+                        }
+                    });
+                }
+            }
+        }
+
+        function initializeCompetencyGroupChartTabs() {
+            if (!competencyGroupTabsContainer || !competencyGroupChartsArea) return;
+            let tabsHtml = '';
+            let chartsHtml = '';
+            competencyGroups.forEach((group, index) => {
+                tabsHtml += `<button type="button" data-group-index="${index}" class="competency-group-tab-button ${index === 0 ? 'active-chart-tab' : ''}">${sanitizeHTML(group.groupName)}</button>`;
+                chartsHtml += `
+                    <div id="chart-group-${group.groupId}" class="competency-group-chart-content ${index === 0 ? 'active-chart-content' : ''}">
+                        <div class="chart-container">
+                            <canvas id="categoryCompetencyRatingsChartGroup-${group.groupId}"></canvas>
+                        </div>
+                    </div>`;
+            });
+            competencyGroupTabsContainer.innerHTML = tabsHtml;
+            competencyGroupChartsArea.innerHTML = chartsHtml;
+
+            document.querySelectorAll('.competency-group-tab-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const groupIndex = parseInt(e.target.dataset.groupIndex);
+                    switchCompetencyGroupChartTab(groupIndex);
+                });
+            });
+        }
+
+        function switchCompetencyGroupChartTab(groupIndex) {
+            currentCompetencyGroupChartTab = groupIndex;
+            document.querySelectorAll('.competency-group-tab-button').forEach((btn, idx) => {
+                btn.classList.toggle('active-chart-tab', idx === groupIndex);
+            });
+            document.querySelectorAll('.competency-group-chart-content').forEach((content, idx) => {
+                content.classList.toggle('active-chart-content', idx === groupIndex);
+            });
+            // Re-render the chart for the newly active tab
+            if (currentCategory && categoryDataCache[currentCategory] && categoryDataCache[currentCategory].data) {
+                renderCompetencyGroupChart(categoryDataCache[currentCategory].data, competencyGroups[groupIndex]);
+            }
+        }
+
+        async function fetchAndRenderDashboardData() {
+            console.log("Fetching dashboard data...");
+            const mainLoader = document.getElementById('loader'); // This loader seems to be for category view, ensure one for dashboard if needed
+            if(mainLoader && dashboardView.contains(mainLoader)) mainLoader.classList.remove('hidden');
+            if(latestSubmissionsGrid) latestSubmissionsGrid.innerHTML = '<p class="text-gray-500 col-span-full text-center">Loading latest submissions...</p>';
+
+            allSubmissionsData = []; // Reset global data
+            const fetchAllPromises = CATEGORIES.map(cat => getDocs(query(collection(db, cat), orderBy("SubmissionTimestamp", "desc"))));
+            const latestPromises = CATEGORIES.map(cat => getDocs(query(collection(db, cat), orderBy("SubmissionTimestamp", "desc"), limit(3))));
+
+            try {
+                const allSnapshots = await Promise.all(fetchAllPromises);
+                allSnapshots.forEach((snapshot, index) => {
+                    snapshot.forEach(doc => {
+                        allSubmissionsData.push({ firestoreDocId: doc.id, category: CATEGORIES[index], ...doc.data() });
+                    });
+                });
+                calculateAndDisplayGlobalMetrics(allSubmissionsData);
+
+                const latestSnapshots = await Promise.all(latestPromises);
+                let latestHtml = '';
+                if (latestSnapshots.every(s => s.empty) && allSubmissionsData.length === 0) {
+                    latestHtml = '<p class="text-gray-500 col-span-full text-center">No submissions found across all categories yet.</p>';
+                } else {
+                    latestSnapshots.forEach((snapshot, index) => {
+                        const categoryName = CATEGORIES[index];
+                        if (!snapshot.empty) {
+                            latestHtml += `<div class="bg-white p-4 rounded-lg shadow"><h3 class="text-md font-semibold text-indigo-700 mb-2 border-b pb-1">Latest in ${categoryName}</h3><div class="space-y-2">`;
+                            snapshot.forEach(doc => {
+                                const item = { firestoreDocId: doc.id, category: categoryName, ...doc.data() };
+                                latestHtml += `
+                                    <div class="latest-submission-item">
+                                        <strong>${sanitizeHTML(item.volunteerName || 'N/A')}</strong> (${sanitizeHTML(item.volunteerCohort || 'N/A')})
+                                        <span class="text-xs text-gray-500 float-right">${formatDate(item.SubmissionTimestamp)}</span>
+                                        <br><button data-entryid="${item.firestoreDocId}" data-category="${item.category}" class="view-entry-btn text-indigo-600 hover:text-indigo-800 text-xs font-medium">View Details</button>
+                                    </div>`;
+                            });
+                            latestHtml += `</div></div>`;
+                        }
+                    });
+                     if (latestHtml === '') {
+                        latestHtml = '<p class="text-gray-500 col-span-full text-center">No recent submissions in individual categories to display here.</p>';
+                    }
+                }
+                if(latestSubmissionsGrid) latestSubmissionsGrid.innerHTML = latestHtml;
+
+                document.querySelectorAll('#dashboardView .view-entry-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const entryId = e.target.dataset.entryid;
+                        const cat = e.target.dataset.category;
+                        // Try to find in allSubmissionsData first for speed
+                        const entry = allSubmissionsData.find(item => item.firestoreDocId === entryId && item.category === cat);
+                        if (entry) { openEntryModal(entry); }
+                        else { // Fallback to direct fetch if not in the initially loaded batch (should be rare for "latest")
+                            const docRef = doc(db, cat, entryId);
+                            const docSnap = await getDoc(docRef);
+                            if (docSnap.exists()) {
+                                openEntryModal({ firestoreDocId: docSnap.id, category: cat, ...docSnap.data() });
+                            } else {
+                                showGenericMessage('Error', 'Could not find entry details.', true);
+                            }
+                        }
+                    });
+                });
+                 console.log("Dashboard data rendered.");
+            } catch (error) {
+                console.error("Error fetching dashboard data:", error);
+                if(latestSubmissionsGrid) latestSubmissionsGrid.innerHTML = `<p class="text-red-500 col-span-full text-center">Error loading latest submissions. ${error.message}. Check console and Firestore permissions.</p>`;
+                if(globalTotalSubmissionsValue) globalTotalSubmissionsValue.textContent = 'Error';
+                calculateAndDisplayGlobalMetrics([]); // Show empty state for metrics on error
+            } finally {
+                if(mainLoader && dashboardView.contains(mainLoader)) mainLoader.classList.add('hidden');
+            }
+        }
+
+        function calculateAndDisplayGlobalMetrics(data) {
+            if (!data || data.length === 0) {
+                if(globalTotalSubmissionsValue) globalTotalSubmissionsValue.textContent = '0';
+                if(globalCommonKeywordsContainer) globalCommonKeywordsContainer.innerHTML = '<p class="text-sm text-gray-500">No data for global keyword analysis.</p>';
+                if(globalChartInstance) {globalChartInstance.destroy(); globalChartInstance = null;}
+                return;
+            }
+            if(globalTotalSubmissionsValue) globalTotalSubmissionsValue.textContent = data.length;
+            const { chartLabels, chartData, allEvidenceText } = processAnalyticsData(data, allCompetenciesForAnalytics);
+            if (globalChartInstance) globalChartInstance.destroy();
+            if (globalCompetencyRatingsChartCanvas && globalCompetencyRatingsChartCanvas.getContext) {
+                const ctx = globalCompetencyRatingsChartCanvas.getContext('2d');
+                globalChartInstance = new Chart(ctx, {
+                    type: 'bar', data: { labels: chartLabels, datasets: [{ label: 'Average Rating', data: chartData, backgroundColor: 'rgba(79, 70, 229, 0.7)', borderColor: 'rgba(79, 70, 229, 1)', borderWidth: 1 }] },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 5 }}, plugins: { legend: {display: false }}}
+                });
+            }
+            renderKeywords(allEvidenceText, globalCommonKeywordsContainer);
+        }
+
+        async function fetchAndRenderCategoryData(categoryName) {
+            const categoryLoader = document.getElementById('loader'); // Specific loader for category view
+            if(categoryAnalyticsView && currentCategorySubView === 'entries') categoryAnalyticsView.classList.add('hidden');
+            if(categoryEntriesView && currentCategorySubView === 'analytics') categoryEntriesView.classList.add('hidden');
+
+            if (categoryDataCache[categoryName] && categoryDataCache[categoryName].data && !categoryDataCache[categoryName].forceRefresh) {
+                filterAndRenderCategoryTable(categoryName); // Use cached data
+                if (currentCategorySubView === 'analytics') { // If switching to analytics with cached data
+                    calculateAndDisplayCategoryMetrics(categoryDataCache[categoryName].data, categoryName);
+                }
+                return;
+            }
+            if(categoryLoader) categoryLoader.classList.remove('hidden');
+            if(submissionCardGridContainer) submissionCardGridContainer.innerHTML = ''; // Clear previous
+            if(noDataMessage) noDataMessage.classList.add('hidden');
+
+            try {
+                const q = query(collection(db, categoryName), orderBy("SubmissionTimestamp", "desc"));
+                const querySnapshot = await getDocs(q);
+                const fetchedData = [];
+                querySnapshot.forEach((doc) => {
+                    fetchedData.push({ firestoreDocId: doc.id, category: categoryName, ...doc.data() });
+                });
+                categoryDataCache[categoryName] = { data: fetchedData, headers: [], forceRefresh: false }; // Store in cache
+                filterAndRenderCategoryTable(categoryName); // Render entries
+                 if (currentCategorySubView === 'analytics') { // If analytics was the target
+                    calculateAndDisplayCategoryMetrics(fetchedData, categoryName);
+                }
+            } catch (error) {
+                console.error(`Error fetching data for ${categoryName}:`, error);
+                showGenericMessage('Error Loading Data', `Could not load data for ${categoryName}. ${error.message}. Check Firestore permissions.`, true);
+                if(noDataMessage) { noDataMessage.textContent = `Error loading data for ${categoryName}.`; noDataMessage.classList.remove('hidden');}
+                categoryDataCache[categoryName] = { data: [], headers: [] }; // Cache empty data on error
+                if (currentCategorySubView === 'analytics') {
+                    calculateAndDisplayCategoryMetrics([], categoryName); // Show empty analytics
+                }
+            } finally {
+                if(categoryLoader) categoryLoader.classList.add('hidden');
+            }
+        }
+
+        function calculateAndDisplayCategoryMetrics(data, categoryName) {
+            if (!data || data.length === 0) {
+                if(categoryAnalyticsView && currentCategory === categoryName && currentCategorySubView === 'analytics') {
+                     if(categoryTotalSubmissionsValue) categoryTotalSubmissionsValue.textContent = '0';
+                     if(categoryCommonKeywordsContainer) categoryCommonKeywordsContainer.innerHTML = '<p class="text-sm text-gray-500">No data to analyze for this category.</p>';
+                     categoryGroupChartInstances.forEach(chart => chart.destroy()); categoryGroupChartInstances = [];
+                     if (competencyGroups.length > 0) renderCompetencyGroupChart([], competencyGroups[currentCompetencyGroupChartTab] || competencyGroups[0]); // Show empty chart structure
+                } return;
+            }
+            if(categoryAnalyticsView && currentCategory === categoryName && currentCategorySubView === 'analytics') categoryAnalyticsView.classList.remove('hidden');
+            if(categoryTotalSubmissionsValue) categoryTotalSubmissionsValue.textContent = data.length;
+            if(categoryAnalyticsTitle) categoryAnalyticsTitle.textContent = categoryName;
+            const { allEvidenceText } = processAnalyticsData(data, allCompetenciesForAnalytics); // Process all competencies for keyword cloud
+            renderKeywords(allEvidenceText, categoryCommonKeywordsContainer);
+            // Render the currently selected competency group chart
+            if (competencyGroups.length > 0) {
+                const activeGroupIndex = currentCompetencyGroupChartTab >= 0 && currentCompetencyGroupChartTab < competencyGroups.length ? currentCompetencyGroupChartTab : 0;
+                const activeTabButton = document.querySelector(`.competency-group-tab-button[data-group-index="${activeGroupIndex}"]`);
+                if(activeTabButton && !activeTabButton.classList.contains('active-chart-tab')) switchCompetencyGroupChartTab(activeGroupIndex); // Ensure correct tab is active
+                else if (competencyGroups[activeGroupIndex]) renderCompetencyGroupChart(data, competencyGroups[activeGroupIndex]);
+            }
+        }
+
+        function renderCompetencyGroupChart(submissionData, competencyGroup) {
+            if (!competencyGroup || !competencyGroup.competencies || competencyGroup.competencies.length === 0) {
+                 const canvasId = competencyGroup ? `categoryCompetencyRatingsChartGroup-${competencyGroup.groupId}` : null;
+                 if (canvasId) {
+                    const existingChartInstance = categoryGroupChartInstances.find(c => c.canvas && c.canvas.id === canvasId);
+                    if (existingChartInstance) { existingChartInstance.destroy(); categoryGroupChartInstances = categoryGroupChartInstances.filter(c => !(c.canvas && c.canvas.id === canvasId)); }
+                    const canvasElement = document.getElementById(canvasId);
+                    if (canvasElement && canvasElement.getContext) { const ctx = canvasElement.getContext('2d'); ctx.clearRect(0,0, canvasElement.width, canvasElement.height); }
+                 } return;
+            }
+            const { chartLabels, chartData } = processAnalyticsData(submissionData, competencyGroup.competencies); // Process data for this specific group
+            const canvasId = `categoryCompetencyRatingsChartGroup-${competencyGroup.groupId}`;
+            const canvasElement = document.getElementById(canvasId);
+            
+            // Destroy existing chart instance for this canvas ID before creating a new one
+            const existingChartIndex = categoryGroupChartInstances.findIndex(c => c.canvas && c.canvas.id === canvasId);
+            if (existingChartIndex !== -1) {
+                categoryGroupChartInstances[existingChartIndex].destroy();
+                categoryGroupChartInstances.splice(existingChartIndex, 1);
+            }
+            
+            if (canvasElement && canvasElement.getContext) {
+                const ctx = canvasElement.getContext('2d');
+                const newChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: `Avg. Rating - ${sanitizeHTML(competencyGroup.groupName)}`,
+                            data: chartData,
+                            backgroundColor: 'rgba(79, 70, 229, 0.6)',
+                            borderColor: 'rgba(79, 70, 229, 1)',
+                            borderWidth: 1.5,
+                            hoverBackgroundColor: 'rgba(79, 70, 229, 0.8)',
+                            hoverBorderColor: 'rgba(67, 56, 202, 1)',
+                            borderRadius: 4,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true, max: 5, grid: { color: 'rgba(0, 0, 0, 0.05)' }, ticks: { color: '#6b7280' } },
+                            x: { grid: { display: false }, ticks: { color: '#6b7280' } }
+                        },
+                        plugins: {
+                            legend: { display: true, position: 'bottom', labels: { color: '#4b5563' } },
+                            tooltip: {
+                                backgroundColor: 'rgba(0,0,0,0.75)', titleColor: '#fff', bodyColor: '#fff',
+                                cornerRadius: 4, displayColors: false,
+                            }
+                        }
+                    }
+                });
+                categoryGroupChartInstances.push(newChart);
+            }
+        }
+
+        function processAnalyticsData(data, competenciesToProcess) {
+            const averageRatings = {}; const chartLabels = []; const chartData = []; let allEvidenceText = "";
+            competenciesToProcess.forEach(comp => { averageRatings[comp.id] = { sum: 0, count: 0, average: 0, name: comp.name }; chartLabels.push(comp.name); });
+            data.forEach(submission => {
+                // Aggregate all evidence text from all competencies for keyword analysis
+                allCompetenciesForAnalytics.forEach(globalComp => {
+                     const evidenceKey = `${globalComp.id}_Evidence`;
+                     if (submission.hasOwnProperty(evidenceKey) && submission[evidenceKey]) allEvidenceText += String(submission[evidenceKey]) + " ";
+                });
+                // Calculate ratings for the specific competenciesToProcess
+                competenciesToProcess.forEach(comp => {
+                    const ratingKey = `${comp.id}_Rating`;
+                    if (submission.hasOwnProperty(ratingKey) && typeof submission[ratingKey] === 'number') { averageRatings[comp.id].sum += submission[ratingKey]; averageRatings[comp.id].count++; }
+                });
+            });
+            competenciesToProcess.forEach(comp => { averageRatings[comp.id].average = averageRatings[comp.id].count > 0 ? parseFloat((averageRatings[comp.id].sum / averageRatings[comp.id].count).toFixed(2)) : 0; chartData.push(averageRatings[comp.id].average); });
+            return { chartLabels, chartData, allEvidenceText };
+        }
+
+        function renderKeywords(text, containerElement) {
+            if (!containerElement) return;
+            const words = String(text).toLowerCase().match(/\b(\w{3,})\b/g) || []; const wordCounts = {};
+            words.forEach(word => { if (!stopWords.has(word) && isNaN(word)) wordCounts[word] = (wordCounts[word] || 0) + 1; });
+            const sortedKeywords = Object.entries(wordCounts).sort(([,a],[,b]) => b - a).slice(0, 10);
+            
+            containerElement.innerHTML = ''; 
+            if (sortedKeywords.length > 0) {
+                const tagsContainer = document.createElement('div');
+                tagsContainer.className = 'keyword-tags-container';
+                sortedKeywords.forEach(([word, count]) => {
+                    const tag = document.createElement('span');
+                    tag.className = 'keyword-tag';
+                    tag.innerHTML = `${sanitizeHTML(word)} <span class="count">${count}</span>`;
+                    tagsContainer.appendChild(tag);
+                });
+                containerElement.appendChild(tagsContainer);
+            } else {
+                containerElement.innerHTML = '<p class="text-sm text-gray-500">No significant keywords found.</p>';
+            }
+        }
+
+        function filterAndRenderCategoryTable(categoryName) {
+            if (!categoryDataCache[categoryName] || !categoryDataCache[categoryName].data) {
+                renderCategoryCards([]); // Render empty if no data
+                currentFilteredDataForCsv = [];
+                return;
+            }
+
+            const searchTerm = globalSearchTermInput.value.toLowerCase();
+            const searchField = globalSearchFieldSelect.value;
+
+            currentFilteredDataForCsv = categoryDataCache[categoryName].data.filter(item => {
+                if (searchTerm === "") return true;
+
+                let itemYear = '';
+                if (item.SubmissionTimestamp) {
+                    try { itemYear = (item.SubmissionTimestamp instanceof Timestamp ? item.SubmissionTimestamp.toDate() : new Date(item.SubmissionTimestamp)).getFullYear().toString(); } catch (e) {}
+                }
+
+                switch (searchField) {
+                    case 'name':
+                        return (item.volunteerName || '').toLowerCase().includes(searchTerm);
+                    case 'email':
+                        return (item.volunteerEmail || '').toLowerCase().includes(searchTerm);
+                    case 'community':
+                        return (item.volunteerCommunity || '').toLowerCase().includes(searchTerm);
+                    case 'cohort':
+                        return (item.volunteerCohort || '').toLowerCase().includes(searchTerm);
+                    case 'country': 
+                        return (item.formCompletedBy || '').toLowerCase().includes(searchTerm);
+                    case 'year':
+                        return itemYear.includes(searchTerm);
+                    case 'all':
+                    default:
+                        return (item.volunteerName || '').toLowerCase().includes(searchTerm) ||
+                               (item.volunteerEmail || '').toLowerCase().includes(searchTerm) ||
+                               (item.volunteerCommunity || '').toLowerCase().includes(searchTerm) ||
+                               (item.volunteerCohort || '').toLowerCase().includes(searchTerm) ||
+                               (item.formCompletedBy || '').toLowerCase().includes(searchTerm) || 
+                               itemYear.includes(searchTerm);
+                }
+            });
+            renderCategoryCards(currentFilteredDataForCsv);
+        }
+
+        function renderCategoryCards(dataToRender) {
+            if(!submissionCardGridContainer) { console.error("submissionCardGridContainer not found"); return; }
+            submissionCardGridContainer.innerHTML = '';
+            if (!dataToRender || dataToRender.length === 0) {
+                if(noDataMessage) { noDataMessage.textContent = currentCategory ? `No submissions for ${currentCategory} with current filters.` : 'No submissions available.'; noDataMessage.classList.remove('hidden'); }
+                return;
+            }
+            if(noDataMessage) noDataMessage.classList.add('hidden');
+
+            dataToRender.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'submission-card';
+                
+                let hasUnreadVolunteerComments = false;
+                const adminLastViewedTime = item.adminLastViewedDiscussionAt instanceof Timestamp ? item.adminLastViewedDiscussionAt.toMillis() : (item.adminLastViewedDiscussionAt ? new Date(item.adminLastViewedDiscussionAt).getTime() : 0);
+
+                if (item.discussionThread && Array.isArray(item.discussionThread)) {
+                    hasUnreadVolunteerComments = item.discussionThread.some(comment => {
+                        const commentTime = comment.timestamp instanceof Timestamp ? comment.timestamp.toMillis() : (comment.timestamp ? new Date(comment.timestamp).getTime() : 0);
+                        return comment.authorRole === 'volunteer' && commentTime > adminLastViewedTime;
+                    });
+                }
+
+                card.innerHTML = `
+                    <div class="card-header cursor-pointer" data-entryid="${item.firestoreDocId}" data-category="${item.category}">
+                        <h3 class="text-md font-semibold text-indigo-700 truncate">${sanitizeHTML(item.volunteerName || 'N/A')}</h3>
+                        <p class="text-xs text-gray-500">${sanitizeHTML(item.volunteerEmail || 'No Email')}</p>
+                    </div>
+                    <div class="card-content space-y-1 cursor-pointer" data-entryid="${item.firestoreDocId}" data-category="${item.category}">
+                        <p class="text-sm text-gray-600"><strong class="font-medium text-gray-700">Community:</strong> ${sanitizeHTML(item.volunteerCommunity || 'N/A')}</p>
+                        <p class="text-sm text-gray-600"><strong class="font-medium text-gray-700">Cohort:</strong> ${sanitizeHTML(item.volunteerCohort || 'N/A')}</p>
+                        <p class="text-sm text-gray-600"><strong class="font-medium text-gray-700">Country:</strong> ${sanitizeHTML(item.formCompletedBy || 'N/A')}</p>
+                        <p class="text-sm text-gray-600"><strong class="font-medium text-gray-700">Submitted:</strong> ${formatDate(item.SubmissionTimestamp)}</p>
+                    </div>
+                    <div class="card-footer">
+                        <button data-entryid="${item.firestoreDocId}" data-category="${item.category}" class="view-details-btn btn btn-primary btn-xs ${hasUnreadVolunteerComments ? 'has-unread' : ''}">
+                            <i class="fas fa-eye mr-1"></i> View Details
+                            <span class="unread-indicator"></span>
+                        </button>
+                        <button data-entryid="${item.firestoreDocId}" data-category="${item.category}" class="add-comment-btn btn btn-secondary btn-xs">
+                            <i class="fas fa-comment-dots mr-1"></i> Comment
+                        </button>
+                    </div>
+                `;
+                submissionCardGridContainer.appendChild(card);
+
+                card.querySelector('.card-header').addEventListener('click', () => openEntryModal(item));
+                card.querySelector('.card-content').addEventListener('click', () => openEntryModal(item));
+                card.querySelector('.view-details-btn').addEventListener('click', (e) => { e.stopPropagation(); openEntryModal(item); });
+                card.querySelector('.add-comment-btn').addEventListener('click', (e) => { e.stopPropagation(); openAdminCommentModal(item); });
+            });
+        }
+
+
+        function handleSearchInput() {
+            clearTimeout(filterTimeout);
+            if (currentView === 'category' && currentCategory) {
+                 filterTimeout = setTimeout(() => filterAndRenderCategoryTable(currentCategory), 300);
+            }
+        }
+
+        async function openEntryModal(entry) {
+            if(!modalBodyContent || !modalEntryTitle || !entryModal || !entry) return;
+            currentOpenEntryForModal = entry; // Store the full entry object
+            modalBodyContent.innerHTML = '<div class="loader my-8"></div>'; // Show loader
+            modalEntryTitle.textContent = `Details for ${sanitizeHTML(entry.volunteerName || 'Volunteer')}`;
+            entryModal.classList.remove('hidden', 'opacity-0');
+            const modalContentDiv = entryModal.querySelector('.modal-content');
+            if (modalContentDiv) { 
+                requestAnimationFrame(() => {
+                    modalContentDiv.classList.remove('scale-95'); 
+                    modalContentDiv.classList.add('scale-100');
+                });
+            }
+            
+            const adminLastViewed = entry.adminLastViewedDiscussionAt instanceof Timestamp ? entry.adminLastViewedDiscussionAt.toMillis() : (entry.adminLastViewedDiscussionAt ? new Date(entry.adminLastViewedDiscussionAt).getTime() : 0);
+            let hasNewVolunteerMessages = false;
+            if(entry.discussionThread && Array.isArray(entry.discussionThread)) {
+                hasNewVolunteerMessages = entry.discussionThread.some(
+                    c => c.authorRole === 'volunteer' && (c.timestamp instanceof Timestamp ? c.timestamp.toMillis() : (c.timestamp ? new Date(c.timestamp).getTime() : 0)) > adminLastViewed
+                );
+            }
+
+            if (hasNewVolunteerMessages || !entry.adminLastViewedDiscussionAt) {
+                console.log(`Updating adminLastViewedDiscussionAt for submission ${entry.firestoreDocId}`);
+                const entryRef = doc(db, entry.category, entry.firestoreDocId);
+                try {
+                    await updateDoc(entryRef, {
+                        adminLastViewedDiscussionAt: serverTimestamp()
+                    });
+                    const now = new Date();
+                    // Update local cache and currentOpenEntryForModal
+                    if (categoryDataCache[entry.category] && categoryDataCache[entry.category].data) {
+                        const index = categoryDataCache[entry.category].data.findIndex(e => e.firestoreDocId === entry.firestoreDocId);
+                        if (index !== -1) {
+                            categoryDataCache[entry.category].data[index].adminLastViewedDiscussionAt = now;
+                            if(currentView === 'category' && currentCategory === entry.category && currentCategorySubView === 'entries') {
+                                filterAndRenderCategoryTable(entry.category); // Re-render to remove indicator
+                            }
+                        }
+                    }
+                    currentOpenEntryForModal.adminLastViewedDiscussionAt = now; // Update the copy for the modal
+                    console.log("adminLastViewedDiscussionAt updated in Firestore.");
+                } catch (err) {
+                   console.error("Error updating adminLastViewedDiscussionAt:", err);
+                   showGenericMessage("Update Error", "Could not mark discussion as viewed by admin.", true);
+                }
+            }
+            
+            setTimeout(() => renderModalContent(currentOpenEntryForModal), 50); // Slight delay for transition
+       }
+
+       function renderModalContent(entry) {
+            if(!modalBodyContent || !entry) return;
+            let contentHtml = '<div class="space-y-6">';
+            const personalInfoKeys = ['volunteerName', 'volunteerCommunity', 'volunteerEmail', 'volunteerCohort', 'formCompletedBy', 'dateCompleted', 'category', 'SubmissionTimestamp', 'SubmissionID'];
+
+            contentHtml += '<div class="p-4 bg-indigo-50 rounded-lg shadow-sm">';
+            contentHtml += '<h4 class="text-lg font-semibold text-indigo-700 mb-3 border-b border-indigo-200 pb-2">Personal Information</h4>';
+            personalInfoKeys.forEach(key => {
+                if (entry.hasOwnProperty(key) && entry[key] != null && String(entry[key]).trim() !== '') {
+                     let label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace(/ Id$/i, ' ID').trim();
+                     if (key === 'formCompletedBy') label = 'Country';
+                     let value = entry[key];
+                     if (key === 'SubmissionTimestamp') value = formatDate(value, true);
+                     else if (key === 'dateCompleted') value = formatDate(value);
+                     else value = sanitizeHTML(String(value));
+                     contentHtml += `<div class="grid grid-cols-3 gap-2 py-1.5 border-b border-indigo-100 last:border-b-0"><strong class="text-sm text-gray-600 col-span-1">${label}:</strong> <span class="text-sm text-gray-800 col-span-2 break-all">${value}</span></div>`;
+                }
+            });
+            contentHtml += '</div>';
+
+            const competencyData = {};
+            Object.keys(entry).forEach(key => {
+                 if (!personalInfoKeys.includes(key) && key !== 'firestoreDocId' && key !== 'discussionThread' && !key.endsWith('Timestamp') && key !== 'adminLastViewedDiscussionAt' && key !== 'volunteerLastViewedDiscussionAt' && key !== 'volunteerId') {
+                    if (key.endsWith('_Rating')) { const baseName = key.replace('_Rating', ''); if (!competencyData[baseName]) competencyData[baseName] = {}; competencyData[baseName].Rating = entry[key]; }
+                    else if (key.endsWith('_Evidence')) { const baseName = key.replace('_Evidence', ''); if (!competencyData[baseName]) competencyData[baseName] = {}; competencyData[baseName].Evidence = entry[key]; }
+                }
+            });
+            let competenciesHtml = '';
+            for (const compName in competencyData) {
+                const readableCompName = compName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
+                competenciesHtml += `<div class="mb-3 p-3 border border-green-200 rounded-md bg-white"><strong class="block text-md font-medium text-green-600 mb-1">${readableCompName}</strong>`;
+                if (competencyData[compName].Rating !== undefined) competenciesHtml += `<div class="text-sm"><span class="font-semibold text-gray-600">Rating:</span> ${sanitizeHTML(String(competencyData[compName].Rating))}/5</div>`;
+                if (competencyData[compName].Evidence) { const evidenceText = sanitizeHTML(String(competencyData[compName].Evidence)).replace(/\n/g, '<br>'); competenciesHtml += `<div class="text-sm mt-1"><span class="font-semibold text-gray-600">Evidence:</span> <div class="mt-0.5 pl-2 text-gray-700 whitespace-pre-wrap break-all">${evidenceText}</div></div>`;}
+                competenciesHtml += `</div>`;
+            }
+            if(competenciesHtml) contentHtml += `<div class="p-4 bg-green-50 rounded-lg shadow-sm mt-6"><h4 class="text-lg font-semibold text-green-700 mb-3 border-b border-green-200 pb-2">Competencies Assessment</h4>${competenciesHtml}</div>`;
+
+            contentHtml += '<div id="discussionThreadDisplaySection" class="discussion-thread-section">';
+            contentHtml += '<h4>Discussion Thread</h4>';
+            if (entry.discussionThread && Array.isArray(entry.discussionThread) && entry.discussionThread.length > 0) {
+                const sortedDiscussion = [...entry.discussionThread].sort((a, b) => {
+                    const timeA = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : (a.timestamp ? new Date(a.timestamp).getTime() : 0);
+                    const timeB = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : (b.timestamp ? new Date(b.timestamp).getTime() : 0);
+                    return timeA - timeB;
+                });
+
+                sortedDiscussion.forEach(item => {
+                    let itemClass = '';
+                    if (item.authorRole === 'admin') {
+                        itemClass = 'admin-comment';
+                         if (auth.currentUser && (item.authorId === auth.currentUser.uid || item.authorEmail === auth.currentUser.email)) {
+                            itemClass += ' my-admin-comment'; 
+                        }
+                    } else if (item.authorRole === 'volunteer') {
+                        itemClass = 'volunteer-reply';
+                    }
+                    contentHtml += `<div class="discussion-item ${itemClass}">`;
+                    contentHtml += `<p>${sanitizeHTML(item.text || '')}</p>`;
+                    contentHtml += `<div class="author-info">`;
+                    contentHtml += `<strong>${sanitizeHTML(item.authorEmail || item.authorRole)}</strong>`;
+                    if (item.timestamp) {
+                        contentHtml += ` - <span class="timestamp">${formatDate(item.timestamp, true)}</span>`;
+                    }
+                    contentHtml += `</div></div>`;
+                });
+            } else {
+                contentHtml += '<p class="text-sm text-gray-500">No discussion items yet.</p>';
+            }
+            contentHtml += '</div>';
+
+            contentHtml += '</div>';
+            modalBodyContent.innerHTML = contentHtml;
+       }
+
+        function closeModal() {
+            if(!entryModal) return; 
+            const modalContentDiv = entryModal.querySelector('.modal-content');
+            if(modalContentDiv){ 
+                modalContentDiv.classList.remove('scale-100'); 
+                modalContentDiv.classList.add('scale-95');
+            }
+            entryModal.classList.add('opacity-0');
+            setTimeout(() => {
+                entryModal.classList.add('hidden');
+                if(modalBodyContent) modalBodyContent.innerHTML = '';
+                currentOpenEntryForModal = null;
+            }, 300);
+        }
+
+        async function handleModalPdfDownload() {
+            if(!currentOpenEntryForModal) { showGenericMessage('Error', 'No entry data for PDF.', true); return; }
+            const entryToPrint = currentOpenEntryForModal;
+             if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') { showGenericMessage('Error', 'PDF generation libraries are not loaded.', true); return; }
+
+            const pdfBtnTextEl = document.getElementById('pdfBtnText');
+            const pdfSpinnerEl = document.getElementById('pdfSpinner');
+
+            if(pdfBtnTextEl) pdfBtnTextEl.classList.add('hidden');
+            if(pdfSpinnerEl) pdfSpinnerEl.classList.remove('hidden');
+            if(downloadModalPdfBtn) { downloadModalPdfBtn.disabled = true; downloadModalPdfBtn.classList.add('btn-disabled');}
+
+            const printableArea = document.createElement('div'); printableArea.id = "pdfPrintableArea"; Object.assign(printableArea.style, { position: "absolute", left: "-9999px", top: "0", width: "800px", padding: "20px", fontFamily: "'Inter', sans-serif", backgroundColor: "white", fontSize: "12px", color: "#333"});
+
+            let pdfContentHtml = `<h1 style="font-size: 20px; font-weight: bold; color: #3730a3; margin-bottom: 15px; text-align: center; border-bottom: 2px solid #4F46E5; padding-bottom: 10px;">Volunteer Submission Details</h1>`;
+            pdfContentHtml += `<h2 style="font-size: 16px; font-weight: 600; color: #4F46E5; margin-bottom: 10px;">Category: ${sanitizeHTML(entryToPrint.category || 'N/A')}</h2>`;
+
+            const personalInfoKeysForPdf = ['volunteerName', 'volunteerCommunity', 'volunteerEmail', 'volunteerCohort', 'formCompletedBy', 'dateCompleted', 'SubmissionTimestamp', 'SubmissionID'];
+            pdfContentHtml += `<div style="margin-bottom: 20px; padding: 12px; border: 1px solid #e0e7ff; border-radius: 6px; background-color: #f9fafb;"><h3 style="font-size: 14px; font-weight: 600; color: #3730a3; margin-bottom:10px; border-bottom: 1px solid #c7d2fe; padding-bottom: 6px;">Personal Information</h3>`;
+            personalInfoKeysForPdf.forEach(key => {
+                if (entryToPrint.hasOwnProperty(key) && entryToPrint[key] != null && String(entryToPrint[key]).trim() !== '') {
+                    let label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace(/ Id$/i, ' ID').trim();
+                    if (key === 'formCompletedBy') label = 'Country';
+                    let value = entryToPrint[key];
+                    if (key === 'SubmissionTimestamp') { value = formatDate(value, true); }
+                    else if (key === 'dateCompleted') { value = formatDate(value); }
+                    else { value = sanitizeHTML(String(value)); }
+                    pdfContentHtml += `<div style="display: flex; margin-bottom: 6px; font-size: 11px; line-height: 1.6;"><strong style="min-width: 180px; color: #4b5563; font-weight: 500;">${label}:</strong> <span style="color: #1f2937; word-break: break-all;">${value}</span></div>`;
+                }
+            });
+            pdfContentHtml += `</div>`;
+
+            const competencyDataForPdf = {};
+            Object.keys(entryToPrint).forEach(key => {
+                 if (!personalInfoKeysForPdf.includes(key) && key !== 'category' && key !== 'firestoreDocId' && key !== 'discussionThread' && !key.endsWith('Timestamp') && key !== 'adminLastViewedDiscussionAt' && key !== 'volunteerLastViewedDiscussionAt' && key !== 'volunteerId') {
+                    if (key.endsWith('_Rating')) { const baseName = key.replace('_Rating', ''); if (!competencyDataForPdf[baseName]) competencyDataForPdf[baseName] = {}; competencyDataForPdf[baseName].Rating = entryToPrint[key]; }
+                    else if (key.endsWith('_Evidence')) { const baseName = key.replace('_Evidence', ''); if (!competencyDataForPdf[baseName]) competencyDataForPdf[baseName] = {}; competencyDataForPdf[baseName].Evidence = entryToPrint[key]; }
+                }
+            });
+            let competenciesPdfHtml = '';
+            for (const compName in competencyDataForPdf) {
+                const readableCompName = compName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
+                competenciesPdfHtml += `<div style="margin-bottom: 12px; padding: 10px; border: 1px solid #a7f3d0; border-radius: 4px; background-color: #f0fdf4;"><strong style="display: block; font-size: 13px; font-weight: 600; color: #065f46; margin-bottom: 5px;">${readableCompName}</strong>`;
+                if (competencyDataForPdf[compName].Rating !== undefined) { competenciesPdfHtml += `<div style="font-size: 11px; margin-bottom: 3px;"><span style="font-weight: 500; color: #4b5563;">Rating:</span> ${sanitizeHTML(String(competencyDataForPdf[compName].Rating))}/5</div>`;}
+                if (competencyDataForPdf[compName].Evidence) { const evidenceHTML = sanitizeHTML(String(competencyDataForPdf[compName].Evidence)).replace(/\n/g, '<br style="margin-bottom: 4px;">'); competenciesPdfHtml += `<div style="font-size: 11px; line-height: 1.5;"><span style="font-weight: 500; color: #4b5563;">Evidence:</span> <div style="margin-top: 2px; padding-left: 6px; color: #374151; word-break: break-word;">${evidenceHTML}</div></div>`;}
+                competenciesPdfHtml += `</div>`;
+            }
+            if(competenciesPdfHtml){ pdfContentHtml += `<div style="margin-top: 20px; padding: 12px; border: 1px solid #d1fae5; border-radius: 6px; background-color: #f9fefc;"><h3 style="font-size: 14px; font-weight: 600; color: #047857; margin-bottom:10px; border-bottom: 1px solid #a7f3d0; padding-bottom: 6px;">Competencies Assessment</h3>`; pdfContentHtml += competenciesPdfHtml; pdfContentHtml += `</div>`;}
+
+            pdfContentHtml += `<div style="margin-top: 20px; padding: 12px; border: 1px solid #e0e7ff; border-radius: 6px; background-color: #f9fafb;"><h3 style="font-size: 14px; font-weight: 600; color: #3730a3; margin-bottom:10px; border-bottom: 1px solid #c7d2fe; padding-bottom: 6px;">Discussion Thread</h3>`;
+            if (entryToPrint.discussionThread && Array.isArray(entryToPrint.discussionThread) && entryToPrint.discussionThread.length > 0) {
+                 const sortedDiscussion = [...entryToPrint.discussionThread].sort((a, b) => {
+                    const timeA = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : (a.timestamp ? new Date(a.timestamp).getTime() : 0);
+                    const timeB = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : (b.timestamp ? new Date(b.timestamp).getTime() : 0);
+                    return timeA - timeB;
+                });
+                sortedDiscussion.forEach(item => {
+                    const authorLabel = item.authorRole === 'admin' ? 'Admin' : 'Volunteer';
+                    pdfContentHtml += `<div style="margin-bottom: 8px; padding: 8px; border-radius: 4px; border: 1px solid ${item.authorRole === 'admin' ? '#fef3c7' : '#dbeafe'}; background-color: ${item.authorRole === 'admin' ? '#fffbeb' : '#eff6ff'};">`;
+                    pdfContentHtml += `<p style="font-size: 11px; line-height: 1.5; color: #374151; white-space: pre-wrap;">${sanitizeHTML(item.text || '')}</p>`;
+                    pdfContentHtml += `<div style="font-size: 9px; color: #78716c; margin-top: 3px;">By: ${sanitizeHTML(item.authorEmail || authorLabel)} on ${formatDate(item.timestamp, true)}</div>`;
+                    pdfContentHtml += `</div>`;
+                });
+            } else {
+                 pdfContentHtml += `<p style="font-size: 11px; color: #78716c;">No discussion items.</p>`;
+            }
+            pdfContentHtml += `</div>`;
+
+            printableArea.innerHTML = pdfContentHtml; document.body.appendChild(printableArea);
+
+            try {
+                const canvas = await html2canvas(printableArea, { scale: 2, useCORS: true, windowWidth: printableArea.scrollWidth, windowHeight: printableArea.scrollHeight, logging: false });
+                const imgData = canvas.toDataURL('image/png'); const { jsPDF } = window.jspdf; const pdf = new jsPDF({orientation: 'p', unit: 'mm', format: 'a4', putOnlyUsedFonts:true, floatPrecision: 16});
+                const pdfWidth = pdf.internal.pageSize.getWidth(); const pdfHeight = pdf.internal.pageSize.getHeight(); const imgProps = pdf.getImageProperties(imgData); const imgRatio = imgProps.width / imgProps.height;
+                let finalImgWidth, finalImgHeight; const margin = 10; const usableWidth = pdfWidth - 2 * margin; const usableHeight = pdfHeight - 2 * margin;
+                if (imgProps.width / usableWidth > imgProps.height / usableHeight) { finalImgWidth = usableWidth; finalImgHeight = finalImgWidth / imgRatio; } else { finalImgHeight = usableHeight; finalImgWidth = finalImgHeight * imgRatio; }
+                const xPos = margin + (usableWidth - finalImgWidth) / 2; const yPos = margin + (usableHeight - finalImgHeight) / 2;
+                pdf.addImage(imgData, 'PNG', xPos, yPos, finalImgWidth, finalImgHeight);
+                const volunteerName = entryToPrint.volunteerName || "Volunteer"; const categoryValue = entryToPrint.category || "Details"; const dateStr = new Date().toISOString().split('T')[0];
+                pdf.save(`${volunteerName.replace(/\s+/g, '_')}_${categoryValue}_Details_${dateStr}.pdf`);
+                showGenericMessage('Success', 'PDF generated and downloaded!');
+            } catch (err) { console.error("Error generating PDF:", err); showGenericMessage('PDF Error', `Could not generate PDF. ${err.message}`, true); }
+            finally {
+                if (document.body.contains(printableArea)) { document.body.removeChild(printableArea); }
+                if(pdfBtnTextEl) pdfBtnTextEl.classList.remove('hidden');
+                if(pdfSpinnerEl) pdfSpinnerEl.classList.add('hidden');
+                if(downloadModalPdfBtn) { downloadModalPdfBtn.disabled = false; downloadModalPdfBtn.classList.remove('btn-disabled');}
+            }
+        }
+
+        function openAdminCommentModal(entry) {
+            if (!entry || !entry.firestoreDocId || !entry.category) {
+                showGenericMessage("Error", "Cannot open comment modal: entry ID or category missing.", true); return;
+            }
+            if(commentEntryIdInput) commentEntryIdInput.value = entry.firestoreDocId;
+            if(commentEntryCategoryInput) commentEntryCategoryInput.value = entry.category;
+            if(adminDiscussionText) adminDiscussionText.value = '';
+            if(commentModalTitle) commentModalTitle.textContent = `Add to Discussion for ${sanitizeHTML(entry.volunteerName || 'Volunteer')}`;
+
+            if(adminCommentModal) {
+                adminCommentModal.classList.remove('hidden', 'opacity-0');
+                const modalDialog = adminCommentModal.querySelector('.modal-content');
+                if (modalDialog) { 
+                    requestAnimationFrame(() => {
+                         modalDialog.classList.add('scale-100'); 
+                         modalDialog.classList.remove('scale-95');
+                    });
+                }
+            }
+        }
+
+        function closeAdminCommentModal() {
+            if(adminCommentModal) {
+                const modalDialog = adminCommentModal.querySelector('.modal-content');
+                if (modalDialog) { 
+                    modalDialog.classList.remove('scale-100');
+                    modalDialog.classList.add('scale-95');
+                }
+                adminCommentModal.classList.add('opacity-0');
+                setTimeout(() => {
+                    adminCommentModal.classList.add('hidden');
+                    if(adminDiscussionText) adminDiscussionText.value = '';
+                }, 300);
+            }
+        }
+
+        async function handleSaveComment() {
+            const entryId = commentEntryIdInput.value;
+            const category = commentEntryCategoryInput.value;
+            const newDiscussionText = adminDiscussionText.value.trim();
+
+            if (!entryId || !category) {
+                showGenericMessage("Error", "Missing entry information for comment.", true); return;
+            }
+            if (!newDiscussionText) {
+                showGenericMessage("Validation Error", "Comment text cannot be empty.", true);
+                if(adminDiscussionText) adminDiscussionText.focus(); return;
+            }
+            if (!auth.currentUser) {
+                 showGenericMessage("Authentication Error", "You must be logged in to comment.", true); return;
+            }
+
+
+            if(saveCommentBtn) saveCommentBtn.disabled = true;
+            if(saveCommentBtnText) saveCommentBtnText.textContent = 'Saving...';
+            if(saveCommentSpinner) saveCommentSpinner.classList.remove('hidden');
+
+            try {
+                const entryRef = doc(db, category, entryId);
+                const newDiscussionItem = {
+                    text: newDiscussionText,
+                    timestamp: new Date(), // Client-side timestamp for arrayUnion
+                    authorId: auth.currentUser.uid,
+                    authorEmail: auth.currentUser.email,
+                    authorRole: "admin"
+                };
+
+                await updateDoc(entryRef, {
+                    discussionThread: arrayUnion(newDiscussionItem),
+                    adminLastViewedDiscussionAt: serverTimestamp() // Update admin's last viewed time
+                });
+
+                showGenericMessage("Success", "Comment added to discussion!");
+                closeAdminCommentModal();
+
+                // Refresh modal content if this entry is currently open
+                if (currentOpenEntryForModal && currentOpenEntryForModal.firestoreDocId === entryId) {
+                    const updatedDocSnap = await getDoc(entryRef); // Re-fetch to get server-resolved timestamps
+                    if (updatedDocSnap.exists()) {
+                        const updatedEntryData = { firestoreDocId: updatedDocSnap.id, category: category, ...updatedDocSnap.data() };
+                        currentOpenEntryForModal = updatedEntryData;
+                        renderModalContent(updatedEntryData); // Re-render the modal
+                    }
+                }
+                // Mark category data for refresh to update unread indicators on main grid
+                if (categoryDataCache[category]) {
+                    categoryDataCache[category].forceRefresh = true;
+                    if(currentView === 'category' && currentCategory === category && currentCategorySubView === 'entries') {
+                        await fetchAndRenderCategoryData(category); // This will re-fetch and re-render
+                    }
+                }
+
+            } catch (error) {
+                console.error("Error saving admin comment:", error);
+                showGenericMessage("Error", `Failed to save comment: ${error.message}`, true);
+            } finally {
+                if(saveCommentBtn) saveCommentBtn.disabled = false;
+                if(saveCommentBtnText) saveCommentBtnText.textContent = 'Add Comment';
+                if(saveCommentSpinner) saveCommentSpinner.classList.add('hidden');
+            }
+        }
+
+        function escapeCsvValue(value) {
+            if (value == null) return '';
+            const stringValue = String(value);
+            if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                return `"${stringValue.replace(/"/g, '""')}"`;
+            }
+            return stringValue;
+        }
+
+        function handleExportCsv() {
+            if (!currentCategory || !categoryDataCache[currentCategory] || !categoryDataCache[currentCategory].data) {
+                showGenericMessage("Error", "No data available to export for the current category.", true);
+                return;
+            }
+            if (currentFilteredDataForCsv.length === 0) {
+                 showGenericMessage("Info", "No filtered data to export. Apply filters or ensure data exists.", false);
+                return;
+            }
+
+            const dataToExport = currentFilteredDataForCsv;
+            const headers = [
+                "Submission ID", "Category", "Volunteer Name", "Email", "Community", "Cohort",
+                "Country", "Date Completed", "Submission Timestamp"
+            ];
+            allCompetenciesForAnalytics.forEach(comp => {
+                headers.push(`${comp.name} Rating`);
+                headers.push(`${comp.name} Evidence`); // Added evidence to CSV
+            });
+            headers.push("Last Admin Comment Text", "Last Volunteer Reply Text");
+
+
+            let csvContent = headers.map(escapeCsvValue).join(',') + '\r\n';
+
+            dataToExport.forEach(item => {
+                const row = [
+                    item.SubmissionID || '', item.category || '',
+                    item.volunteerName || '', item.volunteerEmail || '',
+                    item.volunteerCommunity || '', item.volunteerCohort || '',
+                    item.formCompletedBy || '', item.dateCompleted ? formatDate(item.dateCompleted) : '',
+                    item.SubmissionTimestamp ? formatDate(item.SubmissionTimestamp, true) : ''
+                ];
+
+                allCompetenciesForAnalytics.forEach(comp => {
+                    row.push(item[`${comp.id}_Rating`] != null ? item[`${comp.id}_Rating`] : '');
+                    row.push(item[`${comp.id}_Evidence`] || ''); // Add evidence
+                });
+                
+                let lastAdminComment = '';
+                let lastVolunteerReply = '';
+                if (item.discussionThread && Array.isArray(item.discussionThread)) {
+                    const adminComments = item.discussionThread.filter(c => c.authorRole === 'admin').sort((a,b) => (b.timestamp.toMillis ? b.timestamp.toMillis() : new Date(b.timestamp).getTime()) - (a.timestamp.toMillis ? a.timestamp.toMillis() : new Date(a.timestamp).getTime()));
+                    if (adminComments.length > 0) lastAdminComment = adminComments[0].text;
+                    
+                    const volunteerReplies = item.discussionThread.filter(c => c.authorRole === 'volunteer').sort((a,b) => (b.timestamp.toMillis ? b.timestamp.toMillis() : new Date(b.timestamp).getTime()) - (a.timestamp.toMillis ? a.timestamp.toMillis() : new Date(a.timestamp).getTime()));
+                    if (volunteerReplies.length > 0) lastVolunteerReply = volunteerReplies[0].text;
+                }
+                row.push(lastAdminComment);
+                row.push(lastVolunteerReply);
+
+                csvContent += row.map(escapeCsvValue).join(',') + '\r\n';
+            });
+
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `${currentCategory || 'export'}_submissions_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showGenericMessage("Success", "CSV file download initiated!");
+            } else {
+                showGenericMessage("Error", "CSV download not supported by your browser.", true);
+            }
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volunteer Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; /* Tailwind slate-100 */ }
+        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; } /* Indigo to Purple */
+        .btn { position: relative; padding: 0.65rem 1.25rem; border-radius: 8px; font-weight: 500; transition: all 0.3s ease; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-primary { background-color: #4f46e5; /* Indigo-600 */ color: white; }
+        .btn-primary:hover { background-color: #4338ca; /* Indigo-700 */ }
+        .btn-secondary { background-color: #e0e7ff; /* Indigo-200 */ color: #4f46e5; /* Indigo-600 */ border: 1px solid #4f46e5; }
+        .btn-secondary:hover { background-color: #c7d2fe; /* Indigo-300 */ }
+        .btn-disabled { opacity: 0.6; cursor: not-allowed; }
+        .loader { border: 4px solid #e2e8f0; /* slate-200 */ border-top: 4px solid #6366f1; /* Indigo-500 */ border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 3rem auto; }
+        .spinner { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; width: 16px; height: 16px; animation: spin 1s ease-in-out infinite; display: inline-block; margin-left: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .submission-card {
+            background-color: white;
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); /* Tailwind shadow-md */
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .submission-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1); /* Tailwind shadow-lg */
+        }
+        .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb; /* gray-200 */ }
+        .card-content { padding: 1.25rem; flex-grow: 1; }
+        .card-footer { padding: 1rem 1.25rem; border-top: 1px solid #e5e7eb; background-color: #f9fafb; /* gray-50 */ border-bottom-left-radius: 0.75rem; border-bottom-right-radius: 0.75rem;}
+
+        .modal { background-color: rgba(0,0,0,0.6); transition: opacity 0.3s ease-in-out; }
+        .modal-content {
+            background-color: white; border-radius: 0.75rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+            width: 100%; max-width: 90%; transform: scale(0.95); transition: transform 0.3s ease-in-out;
+            max-height: 90vh; display: flex; flex-direction: column;
+        }
+        @media (min-width: 768px) { .modal-content { max-width: 70%;} }
+        @media (min-width: 1024px) { .modal-content { max-width: 60%;} }
+        .modal.open .modal-content { transform: scale(1); }
+        .modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; background-color: #f9fafb; border-top-left-radius: 0.75rem; border-top-right-radius: 0.75rem;}
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex-grow: 1; }
+        .modal-footer { padding: 1.25rem 1.5rem; border-top: 1px solid #e5e7eb; text-align: right; background-color: #f9fafb; border-bottom-left-radius: 0.75rem; border-bottom-right-radius: 0.75rem;}
+
+        .discussion-thread { margin-top: 1.5rem; padding: 1rem; background-color: #f8fafc; /* slate-50 */ border: 1px solid #e2e8f0; /* slate-200 */ border-radius: 0.5rem; }
+        .discussion-thread h4 { font-size: 1.125rem; font-weight: 600; color: #1e293b; /* slate-800 */ margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; }
+        .discussion-item { padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
+        .discussion-item p { white-space: pre-wrap; margin-bottom: 0.25rem; color: #334155; /* slate-700 */ }
+        .discussion-item .author-info { font-size: 0.8rem; color: #64748b; /* slate-500 */ }
+        .discussion-item.admin-comment { background-color: #fefce8; /* yellow-50 */ border-left: 4px solid #facc15; /* yellow-400 */ }
+        .discussion-item.admin-comment .author-info strong { color: #ca8a04; /* yellow-600 */ }
+        .discussion-item.volunteer-reply { background-color: #f0f9ff; /* sky-50 */ border-left: 4px solid #7dd3fc; /* sky-300 */ }
+        .discussion-item.volunteer-reply .author-info strong { color: #0ea5e9; /* sky-500 */ }
+
+        .discussion-item.my-reply {
+            background-color: #e0f2fe; 
+            border-left-color: #0ea5e9; 
+        }
+        .discussion-item.my-reply .author-info strong {
+            color: #0284c7; 
+        }
+
+
+        .reply-form-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed #cbd5e1; /* slate-300 */ }
+        
+        .unread-indicator {
+            position: absolute; top: 2px; right: 2px; width: 10px; height: 10px;
+            background-color: #ef4444; /* red-500 */ border-radius: 50%; border: 1.5px solid white;
+            display: none; 
+        }
+        .btn.has-unread .unread-indicator { display: block; }
+
+        textarea, input[type="text"], input[type="email"], select {
+            border: 1px solid #d1d5db; border-radius: 6px;
+            padding: 0.5rem 0.75rem; width: 100%;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            background-color: white;
+        }
+        textarea:focus, input[type="text"]:focus, input[type="email"]:focus, select:focus {
+            border-color: #4F46E5; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.25);
+            outline: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="pageLoader" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+        <div class="loader"></div>
+    </div>
+
+    <div id="dashboardContent" class="hidden">
+        <header class="header p-4 shadow-lg">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-2xl md:text-3xl font-bold">Volunteer Portal</h1>
+                <div>
+                    <span id="volunteerNameDisplay" class="mr-2 md:mr-4 text-sm md:text-base"></span>
+                    <button id="logoutButton" class="btn btn-secondary px-3 py-1.5 md:px-4 md:py-2 rounded-md text-xs md:text-sm font-medium">
+                        <i class="fas fa-sign-out-alt mr-1 md:mr-2"></i>Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="container mx-auto p-4 md:p-8">
+            <div class="flex justify-between items-center mb-6 md:mb-8">
+                <h2 class="text-xl md:text-2xl font-semibold text-slate-700">My Submissions</h2>
+                <button id="refreshSubmissionsBtn" class="btn btn-primary px-3 py-1.5 md:px-4 md:py-2 rounded-md text-xs md:text-sm">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
+            </div>
+            <div id="submissionsLoader" class="loader"></div>
+            <div id="submissionsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+            <div id="noSubmissionsMessage" class="text-center text-slate-500 py-10 hidden">
+                <i class="fas fa-folder-open fa-3x mb-3 text-slate-400"></i>
+                <p>You have not made any submissions yet.</p>
+                 <p class="text-xs mt-2">(Or, submissions might be missing a 'volunteerId' field linking them to your account.)</p>
+            </div>
+        </main>
+    </div>
+
+    <div id="submissionModal" class="modal fixed inset-0 z-40 flex items-center justify-center p-4 hidden opacity-0">
+        <div class="modal-content">
+            <div class="modal-header flex justify-between items-center">
+                <h3 id="modalTitle" class="text-xl font-semibold text-slate-800">Submission Details</h3>
+                <button id="closeModalBtn" class="text-slate-500 hover:text-slate-700 text-2xl">&times;</button>
+            </div>
+            <div id="modalBody" class="modal-body">
+            </div>
+            <div class="modal-footer">
+                <button id="modalCloseFooterBtn" class="btn btn-primary px-4 py-2 rounded-md text-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
+     <div id="messageModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden opacity-0 bg-black bg-opacity-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center transform scale-95 transition-transform duration-300">
+            <h3 id="genericModalTitleEl">Notification</h3>
+            <p id="genericModalTextEl">Message here.</p>
+            <button id="genericModalCloseBtn" class="btn btn-primary px-4 py-2 rounded-md text-sm">OK</button>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut as firebaseSignOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { 
+            getFirestore, collection, query, where, getDocs, orderBy, 
+            Timestamp, doc, updateDoc, arrayUnion, getDoc, serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_lcgd9BO8udBIKgvqLfbpWwBQx4gKIqk", 
+            authDomain: "volunteer-competencies.firebaseapp.com",
+            projectId: "volunteer-competencies",
+            storageBucket: "volunteer-competencies.appspot.com",
+            messagingSenderId: "834830665261",
+            appId: "1:834830665261:web:3ef0bfd09600d8ba8a5aa4"
+        };
+
+        const fbApp = initializeApp(firebaseConfig);
+        const auth = getAuth(fbApp);
+        const db = getFirestore(fbApp);
+        console.log("Firebase Volunteer Dashboard Initialized (v10.12.2)");
+
+        const pageLoader = document.getElementById('pageLoader');
+        const dashboardContent = document.getElementById('dashboardContent');
+        const logoutButton = document.getElementById('logoutButton');
+        const volunteerNameDisplay = document.getElementById('volunteerNameDisplay');
+        const submissionsGrid = document.getElementById('submissionsGrid');
+        const submissionsLoader = document.getElementById('submissionsLoader');
+        const noSubmissionsMessage = document.getElementById('noSubmissionsMessage');
+        const refreshSubmissionsBtn = document.getElementById('refreshSubmissionsBtn');
+
+        const submissionModal = document.getElementById('submissionModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const modalCloseFooterBtn = document.getElementById('modalCloseFooterBtn');
+
+        const messageModal = document.getElementById('messageModal');
+        const genericModalTitleEl = document.getElementById('genericModalTitleEl');
+        const genericModalTextEl = document.getElementById('genericModalTextEl');
+        const genericModalCloseBtn = document.getElementById('genericModalCloseBtn');
+
+        const CATEGORIES = ["PST", "IST-1", "IST-2", "COS"];
+        let currentUser = null;
+        let currentOpenSubmission = null; 
+        let allUserSubmissionsCache = []; 
+
+        function sanitizeHTML(str) {
+            if (str === null || typeof str === 'undefined') return '';
+            const temp = document.createElement('div');
+            temp.textContent = String(str); 
+            return temp.innerHTML;
+        }
+
+        function formatDate(dateInput, includeTime = false) {
+            if (!dateInput) return 'N/A';
+            let date;
+            if (dateInput instanceof Timestamp) { date = dateInput.toDate(); }
+            else if (dateInput instanceof Date) { date = dateInput; }
+            else if (typeof dateInput === 'string' || typeof dateInput === 'number') { date = new Date(dateInput); }
+            else { return String(dateInput); } 
+
+            if (isNaN(date.getTime())) return String(dateInput); 
+
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            if (includeTime) {
+                options.hour = '2-digit'; options.minute = '2-digit'; options.hour12 = true;
+            }
+            return date.toLocaleDateString(undefined, options);
+        }
+
+        function showGenericMessage(title, text, isError = false) {
+            if(genericModalTitleEl) genericModalTitleEl.textContent = title;
+            if(genericModalTextEl) genericModalTextEl.textContent = text;
+            if(genericModalTitleEl) genericModalTitleEl.className = `text-lg font-semibold mb-2 ${isError ? 'text-red-600' : 'text-indigo-700'}`;
+            
+            if(messageModal) {
+                messageModal.classList.remove('hidden', 'opacity-0');
+                const modalDialog = messageModal.querySelector('div'); 
+                if (modalDialog) { 
+                    requestAnimationFrame(() => { 
+                        modalDialog.classList.remove('scale-95');
+                        modalDialog.classList.add('scale-100');
+                    });
+                }
+            }
+        }
+
+        function closeGenericMessage() {
+            if(messageModal) {
+                const modalDialog = messageModal.querySelector('div');
+                if (modalDialog) { 
+                    modalDialog.classList.remove('scale-100');
+                    modalDialog.classList.add('scale-95');
+                }
+                messageModal.classList.add('opacity-0');
+                setTimeout(() => messageModal.classList.add('hidden'), 300); 
+            }
+        }
+        if(genericModalCloseBtn) genericModalCloseBtn.addEventListener('click', closeGenericMessage);
+
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user; 
+                console.log("Volunteer Panel - Logged in User UID:", currentUser.uid); // For debugging
+                console.log("Volunteer Panel - Logged in User Email:", currentUser.email); // For debugging
+                if (dashboardContent) dashboardContent.classList.remove('hidden');
+                if (pageLoader) pageLoader.style.display = 'none';
+                if (volunteerNameDisplay) volunteerNameDisplay.textContent = `Welcome, ${user.displayName || user.email}!`;
+                await loadSubmissions(currentUser.uid, true); 
+            } else {
+                currentUser = null;
+                window.location.href = './volunteer-login.html'; 
+            }
+        });
+
+        if(logoutButton) logoutButton.addEventListener('click', async () => {
+            try {
+                await firebaseSignOut(auth);
+            } catch (error) {
+                console.error("Logout error:", error);
+                showGenericMessage("Logout Error", `Failed to logout. ${error.message}`, true);
+            }
+        });
+
+        if(refreshSubmissionsBtn) refreshSubmissionsBtn.addEventListener('click', async () => {
+            if(currentUser && currentUser.uid) {
+                showGenericMessage("Refreshing...", "Fetching latest submissions.");
+                await loadSubmissions(currentUser.uid, true); 
+                setTimeout(closeGenericMessage, 1200); 
+            } else {
+                 showGenericMessage("Error", "Cannot refresh. User not identified.", true);
+            }
+        });
+
+        async function loadSubmissions(volunteerUid, forceRefresh = false) {
+            if (!volunteerUid) {
+                console.error("Cannot load submissions: volunteerUid is undefined.");
+                if(submissionsLoader) submissionsLoader.style.display = 'none';
+                if(noSubmissionsMessage) {
+                    noSubmissionsMessage.innerHTML = `<i class="fas fa-folder-open fa-3x mb-3 text-slate-400"></i> <p>Could not identify your submissions. Please try logging in again.</p>`;
+                    noSubmissionsMessage.classList.remove('hidden');
+                }
+                return;
+            }
+
+            if (!forceRefresh && allUserSubmissionsCache.length > 0) {
+                renderSubmissionsGrid(allUserSubmissionsCache);
+                if(submissionsLoader) submissionsLoader.style.display = 'none';
+                return;
+            }
+
+            if(submissionsLoader) submissionsLoader.style.display = 'block';
+            if(noSubmissionsMessage) noSubmissionsMessage.classList.add('hidden');
+            if(submissionsGrid) submissionsGrid.innerHTML = ''; 
+            allUserSubmissionsCache = []; 
+
+            try {
+                for (const category of CATEGORIES) {
+                    const q = query(
+                        collection(db, category),
+                        where("volunteerId", "==", volunteerUid), 
+                        orderBy("SubmissionTimestamp", "desc")
+                    );
+                    const querySnapshot = await getDocs(q);
+                    querySnapshot.forEach((doc) => {
+                        allUserSubmissionsCache.push({ 
+                            id: doc.id, 
+                            category: category, 
+                            ...doc.data() 
+                        });
+                    });
+                }
+
+                allUserSubmissionsCache.sort((a, b) => {
+                    const dateA = a.SubmissionTimestamp instanceof Timestamp ? a.SubmissionTimestamp.toMillis() : (a.SubmissionTimestamp ? new Date(a.SubmissionTimestamp).getTime() : 0);
+                    const dateB = b.SubmissionTimestamp instanceof Timestamp ? b.SubmissionTimestamp.toMillis() : (b.SubmissionTimestamp ? new Date(b.SubmissionTimestamp).getTime() : 0);
+                    return dateB - dateA; 
+                });
+                renderSubmissionsGrid(allUserSubmissionsCache);
+
+            } catch (error) {
+                console.error(`Error loading submissions (UID: ${volunteerUid}): `, error); // Log UID with error
+                if(submissionsGrid) submissionsGrid.innerHTML = `<p class="text-red-500 text-center sm:col-span-2 lg:col-span-3">Could not load your submissions. Error: ${error.message}. Please try again later.</p>`;
+                 if (error.code === 'failed-precondition' && error.message.toLowerCase().includes('index')) {
+                     if(noSubmissionsMessage) {
+                         noSubmissionsMessage.innerHTML = `<i class="fas fa-exclamation-triangle fa-3x mb-3 text-yellow-400"></i> <p>An index is required for this query. Please check the browser console for a link to create it in Firebase.</p>`;
+                         noSubmissionsMessage.classList.remove('hidden');
+                     }
+                 } else if (error.code === 'permission-denied' || error.message.toLowerCase().includes('permission')) {
+                    if(noSubmissionsMessage) {
+                         noSubmissionsMessage.innerHTML = `<i class="fas fa-exclamation-triangle fa-3x mb-3 text-yellow-400"></i> <p>You do not have permission to view these submissions, or they might be missing a 'volunteerId' field.</p> <p class="text-xs mt-1">Please ensure submissions are correctly linked to your user ID.</p>`;
+                         noSubmissionsMessage.classList.remove('hidden');
+                    }
+                }
+            } finally {
+                if(submissionsLoader) submissionsLoader.style.display = 'none';
+            }
+        }
+
+        function renderSubmissionsGrid(submissions) {
+            if(!submissionsGrid) return;
+            submissionsGrid.innerHTML = ''; 
+
+            if (submissions.length === 0) {
+                if(noSubmissionsMessage) {
+                     noSubmissionsMessage.innerHTML = `<i class="fas fa-folder-open fa-3x mb-3 text-slate-400"></i> <p>You have not made any submissions yet.</p> <p class="text-xs mt-2">(Or, submissions might be missing a 'volunteerId' field linking them to your account.)</p>`;
+                    noSubmissionsMessage.classList.remove('hidden');
+                }
+            } else {
+                if(noSubmissionsMessage) noSubmissionsMessage.classList.add('hidden');
+                submissions.forEach(submission => {
+                    const tile = document.createElement('div');
+                    tile.className = 'submission-card';
+
+                    let hasUnreadAdminComment = false;
+                    const volunteerLastViewedTime = submission.volunteerLastViewedDiscussionAt instanceof Timestamp 
+                                                  ? submission.volunteerLastViewedDiscussionAt.toMillis() 
+                                                  : (submission.volunteerLastViewedDiscussionAt ? new Date(submission.volunteerLastViewedDiscussionAt).getTime() : 0);
+
+                    if (submission.discussionThread && Array.isArray(submission.discussionThread) && submission.discussionThread.length > 0) {
+                        hasUnreadAdminComment = submission.discussionThread.some(comment => {
+                            const commentTime = comment.timestamp instanceof Timestamp ? comment.timestamp.toMillis() : (comment.timestamp ? new Date(comment.timestamp).getTime() : 0);
+                            return comment.authorRole === 'admin' && commentTime > volunteerLastViewedTime;
+                        });
+                    }
+
+                    tile.innerHTML = `
+                        <div class="card-header">
+                            <h3 class="text-lg font-semibold text-indigo-600 truncate">${sanitizeHTML(submission.category)} Submission</h3>
+                        </div>
+                        <div class="card-content">
+                            <p class="text-sm text-slate-600 mb-1"><i class="fas fa-calendar-alt fa-fw mr-2 text-slate-400"></i>Date: ${formatDate(submission.SubmissionTimestamp, true)}</p>
+                            <p class="text-sm text-slate-600"><i class="fas fa-user fa-fw mr-2 text-slate-400"></i>Volunteer: ${sanitizeHTML(submission.volunteerName || 'N/A')}</p>
+                        </div>
+                        <div class="card-footer">
+                            <button data-submission-id="${submission.id}" data-category="${submission.category}" class="view-submission-btn btn btn-primary w-full px-4 py-2 rounded-md text-sm font-medium ${hasUnreadAdminComment ? 'has-unread' : ''}">
+                                <i class="fas fa-comments mr-2"></i>View Details & Discussion
+                                <span class="unread-indicator"></span>
+                            </button>
+                        </div>
+                    `;
+                    submissionsGrid.appendChild(tile);
+                });
+
+                document.querySelectorAll('.view-submission-btn').forEach(button => {
+                    button.addEventListener('click', async (event) => {
+                        const submissionId = event.currentTarget.dataset.submissionId;
+                        const category = event.currentTarget.dataset.category;
+                        
+                        const submissionData = allUserSubmissionsCache.find(s => s.id === submissionId && s.category === category);
+                        
+                        if (submissionData) {
+                            currentOpenSubmission = {...submissionData}; 
+                            
+                            const volunteerLastViewed = currentOpenSubmission.volunteerLastViewedDiscussionAt instanceof Timestamp 
+                                                        ? currentOpenSubmission.volunteerLastViewedDiscussionAt.toMillis() 
+                                                        : (currentOpenSubmission.volunteerLastViewedDiscussionAt ? new Date(currentOpenSubmission.volunteerLastViewedDiscussionAt).getTime() : 0);
+                            
+                            let needsVolunteerReadUpdate = !currentOpenSubmission.volunteerLastViewedDiscussionAt; 
+
+                            if (!needsVolunteerReadUpdate && currentOpenSubmission.discussionThread && Array.isArray(currentOpenSubmission.discussionThread)) {
+                                needsVolunteerReadUpdate = currentOpenSubmission.discussionThread.some(
+                                    c => c.authorRole === 'admin' && (c.timestamp instanceof Timestamp ? c.timestamp.toMillis() : (c.timestamp ? new Date(c.timestamp).getTime() : 0)) > volunteerLastViewed
+                                );
+                            }
+
+                            if (needsVolunteerReadUpdate) {
+                                console.log(`Updating volunteerLastViewedDiscussionAt for submission ${submissionId}`);
+                                const submissionRef = doc(db, category, submissionId);
+                                try {
+                                    await updateDoc(submissionRef, {
+                                        volunteerLastViewedDiscussionAt: serverTimestamp()
+                                    });
+                                    const now = new Date();
+                                    const cacheIndex = allUserSubmissionsCache.findIndex(s => s.id === submissionId && s.category === category);
+                                    if (cacheIndex !== -1) {
+                                        allUserSubmissionsCache[cacheIndex].volunteerLastViewedDiscussionAt = now; 
+                                    }
+                                    currentOpenSubmission.volunteerLastViewedDiscussionAt = now;
+                                    renderSubmissionsGrid(allUserSubmissionsCache); 
+                                    console.log("volunteerLastViewedDiscussionAt updated in Firestore.");
+                                } catch (err) {
+                                    console.error("Error updating volunteerLastViewedDiscussionAt:", err);
+                                    showGenericMessage("Error", "Could not mark discussion as read. Please try again.", true);
+                                }
+                            }
+                            openSubmissionModal(currentOpenSubmission); 
+                        } else {
+                            showGenericMessage("Error", "Could not find submission details.", true);
+                        }
+                    });
+                });
+            }
+        }
+
+        function openSubmissionModal(submission) {
+            if (!modalTitle || !modalBody || !submissionModal) return;
+
+            modalTitle.textContent = `Details for ${sanitizeHTML(submission.category)} Submission on ${formatDate(submission.dateCompleted || submission.SubmissionTimestamp)}`;
+            let bodyHtml = '<div class="space-y-6">';
+
+            bodyHtml += '<div class="p-4 bg-slate-50 rounded-lg border border-slate-200">';
+            bodyHtml += '<h4 class="text-lg font-semibold text-slate-700 mb-3 pb-2 border-b border-slate-200">Personal Information</h4>';
+            const personalKeys = ['volunteerName', 'volunteerCommunity', 'volunteerEmail', 'volunteerCohort', 'formCompletedBy', 'dateCompleted', 'category', 'SubmissionTimestamp', 'SubmissionID'];
+            personalKeys.forEach(key => {
+                if (submission.hasOwnProperty(key) && submission[key] != null && String(submission[key]).trim() !== '') {
+                    let label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace(/ Id$/i, ' ID').trim();
+                    if (key === 'formCompletedBy') label = 'Country';
+                    let value = submission[key];
+                     if (key === 'SubmissionTimestamp' || key === 'dateCompleted') { value = formatDate(value, key === 'SubmissionTimestamp'); } 
+                     else { value = sanitizeHTML(String(value)); }
+                    bodyHtml += `<p class="text-sm mb-1"><strong class="text-slate-600 w-1/3 inline-block">${label}:</strong> <span class="text-slate-800">${value}</span></p>`;
+                }
+            });
+            bodyHtml += '</div>';
+
+            bodyHtml += '<div class="p-4 bg-slate-50 rounded-lg border border-slate-200">';
+            bodyHtml += '<h4 class="text-lg font-semibold text-slate-700 mb-3 pb-2 border-b border-slate-200">Competencies Assessment</h4>';
+            const competencyData = {};
+            Object.keys(submission).forEach(key => {
+                 if (!personalKeys.includes(key) && key !== 'id' && key !== 'firestoreDocId' && key !== 'discussionThread' && key !== 'adminLastViewedDiscussionAt' && key !== 'volunteerLastViewedDiscussionAt' && key !== 'volunteerId') {
+                    if (key.endsWith('_Rating')) { const base = key.replace('_Rating', ''); if(!competencyData[base]) competencyData[base] = {}; competencyData[base].Rating = submission[key]; }
+                    else if (key.endsWith('_Evidence')) { const base = key.replace('_Evidence', ''); if(!competencyData[base]) competencyData[base] = {}; competencyData[base].Evidence = submission[key]; }
+                }
+            });
+
+            if (Object.keys(competencyData).length > 0) {
+                for (const compName in competencyData) {
+                    const readableName = compName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
+                    bodyHtml += `<div class="mb-3 p-3 border-b border-slate-100 last:border-b-0">`;
+                    bodyHtml += `<strong class="block text-md font-medium text-indigo-600">${readableName}</strong>`;
+                    if (competencyData[compName].Rating !== undefined) bodyHtml += `<p class="text-sm text-slate-600">Rating: ${sanitizeHTML(String(competencyData[compName].Rating))}/5</p>`;
+                    if (competencyData[compName].Evidence) bodyHtml += `<p class="text-sm text-slate-600 mt-1">Evidence: <span class="italic whitespace-pre-wrap break-words">${sanitizeHTML(String(competencyData[compName].Evidence))}</span></p>`;
+                    bodyHtml += `</div>`;
+                }
+            } else {
+                bodyHtml += '<p class="text-sm text-slate-500">No competency data available for this submission.</p>';
+            }
+            bodyHtml += '</div>';
+
+            bodyHtml += '<div class="discussion-thread">';
+            bodyHtml += '<h4>Discussion Thread</h4>';
+            if (submission.discussionThread && Array.isArray(submission.discussionThread) && submission.discussionThread.length > 0) {
+                const sortedDiscussion = [...submission.discussionThread].sort((a,b) => {
+                    const timeA = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : (a.timestamp ? new Date(a.timestamp).getTime() : 0);
+                    const timeB = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : (b.timestamp ? new Date(b.timestamp).getTime() : 0);
+                    return timeA - timeB; 
+                });
+                sortedDiscussion.forEach(item => {
+                    let itemClass = '';
+                    if (item.authorRole === 'admin') {
+                        itemClass = 'admin-comment';
+                    } else if (item.authorRole === 'volunteer') {
+                        itemClass = 'volunteer-reply';
+                        if (currentUser && (item.authorId === currentUser.uid || item.authorEmail === currentUser.email)) {
+                            itemClass += ' my-reply';
+                        }
+                    }
+                    bodyHtml += `<div class="discussion-item ${itemClass}">`;
+                    bodyHtml += `<p>${sanitizeHTML(item.text || '')}</p>`;
+                    bodyHtml += `<div class="author-info">`;
+                    bodyHtml += `<strong>${sanitizeHTML(item.authorEmail || item.authorRole)}</strong>`;
+                    if (item.timestamp) {
+                        bodyHtml += ` - <span class="timestamp">${formatDate(item.timestamp, true)}</span>`;
+                    }
+                    bodyHtml += `</div></div>`;
+                });
+            } else {
+                 bodyHtml += '<p class="text-sm text-slate-500">No discussion items yet.</p>';
+            }
+            bodyHtml += '</div>';
+
+            bodyHtml += `
+                <div class="reply-form-section">
+                    <h4 class="text-md font-semibold text-slate-700 mb-2">Add Your Reply:</h4>
+                    <textarea id="volunteerReplyText" rows="3" class="w-full p-2" placeholder="Type your reply..."></textarea>
+                    <button id="submitReplyBtn" class="btn btn-primary px-4 py-2 rounded-md text-sm mt-3">
+                        Submit Reply <span id="replySpinner" class="spinner hidden"></span>
+                    </button>
+                </div>
+            `;
+
+            bodyHtml += '</div>'; 
+            modalBody.innerHTML = bodyHtml;
+
+            const submitReplyBtn = document.getElementById('submitReplyBtn');
+            if (submitReplyBtn) {
+                submitReplyBtn.addEventListener('click', handleSaveReply);
+            }
+
+            submissionModal.classList.remove('hidden', 'opacity-0');
+            submissionModal.classList.add('open');
+            const modalDialog = submissionModal.querySelector('.modal-content');
+            if(modalDialog) {
+                requestAnimationFrame(() => {
+                    modalDialog.classList.remove('scale-95');
+                    modalDialog.classList.add('scale-100');
+                });
+            }
+        }
+
+        async function handleSaveReply() {
+            if (!currentOpenSubmission || !currentUser) {
+                showGenericMessage("Error", "Cannot save reply. Submission or user data missing.", true);
+                return;
+            }
+            const replyTextarea = document.getElementById('volunteerReplyText');
+            if (!replyTextarea) {
+                 showGenericMessage("Error", "Reply input field not found.", true);
+                return;
+            }
+            const replyText = replyTextarea.value.trim();
+
+            if (!replyText) {
+                showGenericMessage("Validation Error", "Reply text cannot be empty.", true);
+                replyTextarea.focus();
+                return;
+            }
+
+            const submitReplyBtn = document.getElementById('submitReplyBtn');
+            const replySpinner = document.getElementById('replySpinner');
+            if(submitReplyBtn) {
+                submitReplyBtn.disabled = true;
+                submitReplyBtn.classList.add('btn-disabled');
+            }
+            if(replySpinner) replySpinner.classList.remove('hidden');
+
+            const newReplyObject = {
+                text: replyText,
+                timestamp: new Date(), 
+                authorId: currentUser.uid,
+                authorEmail: currentUser.email,
+                authorRole: "volunteer"
+            };
+
+            try {
+                const submissionRef = doc(db, currentOpenSubmission.category, currentOpenSubmission.id);
+                await updateDoc(submissionRef, {
+                    discussionThread: arrayUnion(newReplyObject),
+                    volunteerLastViewedDiscussionAt: serverTimestamp() 
+                });
+
+                showGenericMessage("Success", "Your reply has been submitted!");
+                replyTextarea.value = ''; 
+
+                const updatedDocSnap = await getDoc(submissionRef);
+                if (updatedDocSnap.exists()) {
+                    const updatedData = { id: updatedDocSnap.id, category: currentOpenSubmission.category, ...updatedDocSnap.data() };
+                    currentOpenSubmission = updatedData; 
+                    
+                    const cacheIndex = allUserSubmissionsCache.findIndex(s => s.id === updatedData.id && s.category === updatedData.category);
+                    if (cacheIndex !== -1) {
+                        allUserSubmissionsCache[cacheIndex] = updatedData;
+                    } else {
+                        allUserSubmissionsCache.push(updatedData); 
+                    }
+                    openSubmissionModal(updatedData); 
+                    renderSubmissionsGrid(allUserSubmissionsCache); 
+                }
+
+            } catch (error) {
+                console.error("Error saving reply:", error);
+                showGenericMessage("Error", `Failed to save reply: ${error.message}`, true);
+            } finally {
+                if(submitReplyBtn) {
+                    submitReplyBtn.disabled = false;
+                    submitReplyBtn.classList.remove('btn-disabled');
+                }
+                if(replySpinner) replySpinner.classList.add('hidden');
+            }
+        }
+
+
+        function closeSubmissionModal() {
+            if (!submissionModal) return;
+            const modalDialog = submissionModal.querySelector('.modal-content');
+            if(modalDialog) {
+                modalDialog.classList.remove('scale-100');
+                modalDialog.classList.add('scale-95');
+            }
+            submissionModal.classList.add('opacity-0');
+            submissionModal.classList.remove('open');
+            setTimeout(() => {
+                submissionModal.classList.add('hidden');
+                if(modalBody) modalBody.innerHTML = ''; 
+                currentOpenSubmission = null; 
+            }, 300);
+        }
+
+        if(closeModalBtn) closeModalBtn.addEventListener('click', closeSubmissionModal);
+        if(modalCloseFooterBtn) modalCloseFooterBtn.addEventListener('click', closeSubmissionModal);
+        if(submissionModal) submissionModal.addEventListener('click', (event) => {
+            if (event.target === submissionModal) { 
+                closeSubmissionModal();
+            }
+        });
+
+    </script>
+</body>
+</html>

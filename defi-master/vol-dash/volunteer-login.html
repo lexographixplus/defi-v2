@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volunteer Portal Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .auth-loader {
+            border: 4px solid #f3f3f3; border-top: 4px solid #4F46E5;
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite;
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        .login-container {
+            background-color: white; padding: 2.5rem;
+            border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%; max-width: 400px;
+        }
+        .login-header h1 { font-size: 1.75rem; font-weight: 700; color: #3730a3; }
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { display: block; font-weight: 500; color: #374151; margin-bottom: 0.5rem; }
+        .form-group input {
+            width: 100%; padding: 0.75rem; border: 1px solid #d1d5db;
+            border-radius: 6px; transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .form-group input:focus {
+            border-color: #4F46E5; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.25); outline: none;
+        }
+        .btn-action {
+            width: 100%; padding: 0.85rem 1.5rem; border-radius: 8px; font-weight: 500;
+            transition: all 0.3s ease; border: none; cursor: pointer;
+            background: linear-gradient(135deg, #4F46E5 0%, #8B5CF6 100%); color: white;
+            font-size: 1rem; position: relative; display: flex; align-items: center; justify-content: center;
+        }
+        .btn-action:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4); }
+        .btn-action .btn-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff;
+            width: 20px; height: 20px; animation: btnSpin 0.8s ease-in-out infinite;
+            margin-left: 10px; display: none;
+        }
+        @keyframes btnSpin { to { transform: rotate(360deg); } }
+        .btn-action.loading .btn-text { opacity: 0.7; }
+        .btn-action.loading .btn-spinner { display: inline-block; }
+        .error-message {
+            background-color: #fee2e2; color: #b91c1c; padding: 0.75rem;
+            border-radius: 6px; margin-top: 1rem; text-align: center;
+            font-size: 0.875rem; display: none;
+        }
+        .toggle-auth { margin-top: 1.5rem; text-align: center; font-size: 0.875rem; color: #4b5563;}
+        .toggle-auth button { color: #4F46E5; font-weight: 500; background: none; border: none; cursor: pointer; padding:0; }
+        .toggle-auth button:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div id="authLoader" class="auth-loader" style="display: none;"></div>
+    <div id="pageContent" class="login-container">
+        <div class="login-header text-center mb-8">
+            <h1 id="formTitle">Volunteer Login</h1>
+        </div>
+        <form id="authForm">
+            <div id="nameFieldContainer" class="form-group hidden"> <label for="name">Full Name (For New Account)</label>
+                <input type="text" id="name" name="name" autocomplete="name">
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn-action" id="authButton">
+                <span class="btn-text" id="authButtonText">Login</span>
+                <div class="btn-spinner"></div>
+            </button>
+            <div id="errorMessage" class="error-message"></div>
+        </form>
+        <div class="toggle-auth">
+            <span id="toggleText">Don't have an account?</span>
+            <button type="button" id="toggleAuthMode">Sign Up</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import {
+            getAuth,
+            signInWithEmailAndPassword,
+            createUserWithEmailAndPassword,
+            onAuthStateChanged,
+            updateProfile
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_lcgd9BO8udBIKgvqLfbpWwBQx4gKIqk", // Replace with your actual API key
+            authDomain: "volunteer-competencies.firebaseapp.com",
+            projectId: "volunteer-competencies",
+            storageBucket: "volunteer-competencies.appspot.com",
+            messagingSenderId: "834830665261",
+            appId: "1:834830665261:web:3ef0bfd09600d8ba8a5aa4"
+        };
+
+        const fbApp = initializeApp(firebaseConfig);
+        const auth = getAuth(fbApp);
+
+        const authForm = document.getElementById('authForm');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const nameInput = document.getElementById('name'); // For signup
+        const errorMessageDiv = document.getElementById('errorMessage');
+        const authLoaderDiv = document.getElementById('authLoader');
+        const pageContentDiv = document.getElementById('pageContent');
+        const authButton = document.getElementById('authButton');
+        const authButtonText = document.getElementById('authButtonText');
+        const toggleAuthModeBtn = document.getElementById('toggleAuthMode');
+        const formTitle = document.getElementById('formTitle');
+        const toggleText = document.getElementById('toggleText');
+        const nameFieldContainer = document.getElementById('nameFieldContainer');
+
+        let isLoginMode = true;
+
+        function setAuthButtonLoading(isLoading, actionText = (isLoginMode ? 'Logging in...' : 'Signing Up...')) {
+            if (isLoading) {
+                authButton.classList.add('loading');
+                authButton.disabled = true;
+                authButtonText.textContent = actionText;
+            } else {
+                authButton.classList.remove('loading');
+                authButton.disabled = false;
+                authButtonText.textContent = isLoginMode ? 'Login' : 'Sign Up';
+            }
+        }
+
+        toggleAuthModeBtn.addEventListener('click', () => {
+            isLoginMode = !isLoginMode;
+            authForm.reset(); // Reset form fields
+            errorMessageDiv.style.display = 'none';
+            errorMessageDiv.textContent = '';
+
+            if (isLoginMode) {
+                formTitle.textContent = 'Volunteer Login';
+                authButtonText.textContent = 'Login';
+                toggleText.textContent = "Don't have an account?";
+                toggleAuthModeBtn.textContent = 'Sign Up';
+                nameFieldContainer.classList.add('hidden');
+                nameInput.required = false;
+            } else {
+                formTitle.textContent = 'Volunteer Sign Up';
+                authButtonText.textContent = 'Sign Up';
+                toggleText.textContent = 'Already have an account?';
+                toggleAuthModeBtn.textContent = 'Login';
+                nameFieldContainer.classList.remove('hidden');
+                nameInput.required = true;
+            }
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            authLoaderDiv.style.display = 'block';
+            pageContentDiv.style.display = 'none';
+            if (user) {
+                // User is signed in, redirect to volunteer dashboard
+                window.location.href = './index.html';
+            } else {
+                // No user is signed in.
+                authLoaderDiv.style.display = 'none';
+                pageContentDiv.style.display = 'block';
+            }
+        });
+
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorMessageDiv.style.display = 'none';
+            errorMessageDiv.textContent = '';
+
+            const email = emailInput.value;
+            const password = passwordInput.value;
+            const name = nameInput.value;
+
+            setAuthButtonLoading(true);
+
+            try {
+                if (isLoginMode) {
+                    // Login
+                    await signInWithEmailAndPassword(auth, email, password);
+                    // onAuthStateChanged will handle redirection
+                } else {
+                    // Sign Up
+                    if (!name.trim()) {
+                        throw { code: 'auth/missing-name', message: 'Please enter your full name.' };
+                    }
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    await updateProfile(userCredential.user, { displayName: name });
+                    // onAuthStateChanged will handle redirection
+                }
+            } catch (error) {
+                console.error("Authentication error:", error);
+                let friendlyMessage = "An error occurred. Please try again.";
+                switch (error.code) {
+                    case 'auth/invalid-credential':
+                    case 'auth/user-not-found':
+                    case 'auth/wrong-password':
+                        friendlyMessage = "Invalid email or password.";
+                        break;
+                    case 'auth/invalid-email':
+                        friendlyMessage = "Please enter a valid email address.";
+                        break;
+                    case 'auth/weak-password':
+                        friendlyMessage = "Password is too weak. It should be at least 6 characters.";
+                        break;
+                    case 'auth/email-already-in-use':
+                        friendlyMessage = "This email address is already in use. Try logging in.";
+                        break;
+                    case 'auth/too-many-requests':
+                        friendlyMessage = "Access temporarily disabled due to too many failed attempts. Try again later.";
+                        break;
+                    case 'auth/missing-name':
+                         friendlyMessage = error.message;
+                         break;
+                }
+                errorMessageDiv.textContent = friendlyMessage;
+                errorMessageDiv.style.display = 'block';
+                setAuthButtonLoading(false);
+            }
+            // No need to call setAuthButtonLoading(false) on success here, as redirection will happen.
+        });
+    </script>
+</body>
+</html>
